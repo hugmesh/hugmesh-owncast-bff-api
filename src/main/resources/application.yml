@@ -1,0 +1,98 @@
+spring:
+  application:
+    name: hugmesh-owncast-bff-api
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: "${CASDOOR_ISSUER_URI:https://id.hugmesh.systems}"
+
+  # Runtime data access is REACTIVE (R2DBC) over the owncast-bff governance store: the
+  # owncast_grant broadcast grant/timeout/ban overlay (PR2) and the owncast_stream
+  # self-visibility table (PR3) are both shipped. The streamer-ConfigMap reconciler is
+  # still planned (not yet on main — see the README Roadmap).
+  r2dbc:
+    url: "${SPRING_R2DBC_URL:r2dbc:postgresql://owncast-bff-db.hugmesh-backend.svc.cluster.local:5432/owncastbff}"
+    username: "${SPRING_R2DBC_USERNAME:owncastbff}"
+    password: "${SPRING_R2DBC_PASSWORD:}"
+
+  # Liquibase owns schema migrations. It has NO R2DBC runner, so it uses a plain
+  # JDBC datasource — the ONLY JDBC use in the app; all runtime access is R2DBC.
+  liquibase:
+    enabled: true
+    change-log: "classpath:db/changelog/db.changelog-master.xml"
+    url: "${SPRING_LIQUIBASE_URL:jdbc:postgresql://owncast-bff-db.hugmesh-backend.svc.cluster.local:5432/owncastbff}"
+    user: "${SPRING_LIQUIBASE_USER:owncastbff}"
+    password: "${SPRING_LIQUIBASE_PASSWORD:}"
+
+# SpringDoc OpenAPI. The spec at /v3/api-docs is the source the platform
+# ng-openapi-gen typed client (the paired hugmesh-owncast-ui, PR5) + the docs
+# pipeline consume. Spec + UI are gated by SecurityConfig: permitAll under dev/test (so
+# `gen:fetch` can curl the spec without a token) and ROLE_ADMIN otherwise (prod).
+springdoc:
+  # Pin the default response media type to application/json. WITHOUT this springdoc
+  # emits a `*/*` content key for responses, which ng-openapi-gen maps to Blob — that
+  # breaks JSON parsing in the generated typed client. Every endpoint on this BFF is
+  # pure JSON; any binary endpoint that ever needs octet-stream must keep its OWN
+  # explicit `produces` on the mapping (none today). Additive: no behaviour change.
+  default-produces-media-type: application/json
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+    # Pin the dumped spec to OpenAPI 3.0.1. springdoc-openapi 3.x (pulled in by Boot 4)
+    # defaults to 3.1.0, whose type-array form (`"type": ["string","null"]`) crashes
+    # ng-openapi-gen 0.51.0 with "type.startsWith is not a function". 3.0 keeps the
+    # scalar `"type": "string"` + `nullable: true` form the generator understands.
+    version: openapi_3_0
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+  # Restrict the component scan to this BFF's own controllers so the spec stays the
+  # owncast-BFF surface only (no stray springframework/actuator paths leak in).
+  packages-to-scan: systems.hugmesh.owncastbff
+
+owncast:
+  playback:
+    # HLS playback URL template for the in-platform Owncast player.
+    # Supports two placeholders: {domain} = brand/tenant, {subject} = Casdoor owner subject.
+    # Example: https://{domain}.example/owncast/{subject}/hls/stream.m3u8
+    # DARK BY DEFAULT: leave unset (or set to the empty string) to disable the in-platform
+    # player; the playbackUrl field will be absent from responses so the UI degrades
+    # gracefully to the placeholder. Set OWNCAST_PLAYBACK_URL_TEMPLATE at deployment time.
+    url-template: "${OWNCAST_PLAYBACK_URL_TEMPLATE:}"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+server:
+  port: 8080
+  # ── API-to-API mTLS enforcement (server side) ──────────────────────────────
+  # When the in-cluster keystore initContainer is mounted (PKCS12 keystore.p12 =
+  # this service's Vault-PKI identity + truststore.p12 = the cluster CA), the
+  # deployment flips these on so the TLS handshake REQUIRES a client cert that chains
+  # to the cluster CA. A caller that was NOT deployed+signed by our Vault/ESO PKI
+  # process holds no such cert, so its handshake is rejected.
+  #
+  # Defaults keep local/dev/CI working: ssl.enabled=false (plaintext) and
+  # client-auth=none, so the truststore is never opened and existing tests are
+  # unaffected. In-cluster, the deployment sets SSL_ENABLED=true,
+  # SSL_CLIENT_AUTH=need and points the key-store/trust-store at the mounted PKCS12
+  # stores. The store passwords are generated in-pod and injected via env.
+  ssl:
+    enabled: "${SSL_ENABLED:false}"
+    client-auth: "${SSL_CLIENT_AUTH:none}"
+    key-store: "${SSL_KEY_STORE:/stores/keystore.p12}"
+    key-store-type: "${SSL_KEY_STORE_TYPE:PKCS12}"
+    key-store-password: "${SSL_KEY_STORE_PASSWORD:}"
+    trust-store: "${SSL_TRUST_STORE:/stores/truststore.p12}"
+    trust-store-type: "${SSL_TRUST_STORE_TYPE:PKCS12}"
+    trust-store-password: "${SSL_TRUST_STORE_PASSWORD:}"
+    # TLSv1.3 floor (forward-secret, AEAD-only) — matches the gateway chart.
+    enabled-protocols: "${SSL_ENABLED_PROTOCOLS:TLSv1.3}"

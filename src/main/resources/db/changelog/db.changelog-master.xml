@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      Owncast BFF schema (the broadcast GOVERNANCE plane). Liquibase runs over a JDBC
+      datasource (Liquibase has no R2DBC runner); all runtime data access goes through
+      R2DBC.
+
+        004 — owncast_grant   (PR2 — the broadcast grant/timeout/ban OVERLAY; desired-state
+              CLONED from the wiki-bff wiki_access (004) overlay, swapping read->broadcast:
+              state active->revoked never deleted=audit, expires_at NULL=permanent / future=
+              timeout-auto-restore, partial-unique on active(domain,user_subject,access_type),
+              domain-scoped. The OwncastBroadcastGuard DEFAULT-DENY enforcement reads this at
+              request time.)
+
+        005 — owncast_stream  (PR3 — the per-streamer SELF-VISIBILITY row: one per
+              (domain, user_subject), title/description + a visibility flag the streamer
+              themselves flips between 'internal' and 'public'. OWNER-controlled (sibling of
+              the ADMIN-controlled owncast_grant overlay); a public flip is gated server-side
+              on the owner holding an active broadcast grant. The streamer-ConfigMap
+              reconciler + stream-key Secret mint remain a DEFERRED generator-gated follow-up.)
+
+        006 — owncast_moderation_audit (PR4 — the MODERATION surface /bff/owncast/mod/**:
+              an APPEND-ONLY journal of moderator actions (kill | hide | restore) recording
+              actor/target/domain/action/reason. The mod actions REUSE owncast_grant
+              (access_type=banned) for the ban/restore state + owncast_stream for the hide —
+              this table is the local traceability layer ON TOP, NOT a parallel ban store.
+              The cross-repo mod-bff ModActionType owncast.* wiring stays a DEFERRED follow-up.)
+
+      The changeSet numbering starts at 004 to match the wiki_access (004) overlay
+      owncast_grant is cloned from (001-003 in wiki-bff are the wiki content store, which
+      owncast has no analogue of — broadcast is grant-only).
+    -->
+
+    <include file="db/changelog/004-owncast-grant.xml"/>
+    <include file="db/changelog/005-owncast-stream.xml"/>
+    <include file="db/changelog/006-owncast-moderation-audit.xml"/>
+
+    <!-- 007 — DB-generated UUID primary keys: add a (gen_random_uuid())::text DEFAULT to
+         each of the three varchar id PKs so Postgres mints the id (the app stops calling
+         UUID.randomUUID().toString()) and the repository INSERTs read it back via
+         RETURNING id. Registered LAST; one band above the current max (006). Adopts the
+         merged mod-bff #36 / admin-bff #133 pattern. -->
+    <include file="db/changelog/007-db-generated-uuid-pks.xml"/>
+</databaseChangeLog>

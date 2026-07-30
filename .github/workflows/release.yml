@@ -1,0 +1,82 @@
+name: Release
+
+# Manual-only. Deliberately NOT wired to push/tag triggers -- this workflow
+# must stay fully inert until a human turns it on. Mirrors the container
+# build this repo's .gitlab-ci.yml already runs (test:unit -> build:image),
+# but publishes to GHCR instead of the org's in-cluster GitLab registry.
+on:
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/hugmesh-net/hugmesh-owncast-bff-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      # `-s settings.xml` points Maven at the org's gitlab-maven GROUP registry so the
+      # PRIVATE systems.hugmesh:hugmesh-parent / hugmesh-commons artifacts resolve
+      # (they are not on Maven Central). Auth is a GitLab CI_JOB_TOKEN -- this has
+      # nothing to authenticate with until that secret is populated, which is expected
+      # for an inert workflow_dispatch-only release job.
+      - name: Run tests
+        env:
+          CI_API_V4_URL: ${{ secrets.CI_API_V4_URL }}
+          GITLAB_GROUP_ID: ${{ secrets.GITLAB_GROUP_ID }}
+          CI_JOB_TOKEN: ${{ secrets.CI_JOB_TOKEN }}
+        run: ./mvnw -B -s settings.xml -DskipITs test
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tag
+        id: vars
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      # The Dockerfile's build stage resolves the PRIVATE systems.hugmesh:hugmesh-commons
+      # Maven artifact via the committed settings.xml, against the org's GitLab Maven
+      # Package Registry, authenticated with a GitLab CI_JOB_TOKEN passed in as a
+      # BuildKit secret (never a build-arg, never baked into a layer) -- same contract
+      # as the .gitlab-ci.yml build:image job. Populate the CI_API_V4_URL /
+      # GITLAB_GROUP_ID / CI_JOB_TOKEN repo secrets before enabling this workflow for
+      # real; until then it has nothing to authenticate with.
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          pull: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.vars.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            CI_API_V4_URL=${{ secrets.CI_API_V4_URL }}
+            GITLAB_GROUP_ID=${{ secrets.GITLAB_GROUP_ID }}
+          secrets: |
+            ci_job_token=${{ secrets.CI_JOB_TOKEN }}

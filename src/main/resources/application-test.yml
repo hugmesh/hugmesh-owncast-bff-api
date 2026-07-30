@@ -1,0 +1,11 @@
+# Test profile overrides. Full-context @SpringBootTest tests now extend the shared
+# systems.hugmesh.commons.testsupport.PostgresTestSupport base, which boots a real
+# per-class Testcontainers Postgres and wires spring.r2dbc.url + spring.liquibase.url
+# (and credentials) to it via @DynamicPropertySource. So the REAL R2dbc + Liquibase
+# auto-config must be ACTIVE here (it builds the ConnectionFactory + runs the
+# changelog against the fresh Testcontainers db) — the old H2 dual-connection
+# TestDatabaseConfig + its autoconfigure-exclude block has been removed (it broke under
+# Spring Boot 4's dual-connection model, and a stale Boot-3 exclude FQCN would be a
+# silent no-op anyway). The context-load test still mocks the reactive JWT decoder so
+# no live Casdoor is needed.
+spring: {}

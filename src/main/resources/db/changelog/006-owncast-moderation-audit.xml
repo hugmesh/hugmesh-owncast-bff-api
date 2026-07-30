@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      owncast_moderation_audit — the APPEND-ONLY local traceability log of the MODERATION
+      surface (PR4 — /bff/owncast/mod/**). Every moderator action (kill | hide | restore)
+      writes one row recording WHO (actor_subject) did WHAT (action) to WHOM (target_subject)
+      in WHICH brand (domain) and WHY (reason), at WHEN (created_at):
+
+        - APPEND-ONLY: rows are only ever INSERTed (never updated / deleted). The actual
+          ban/restore state lives in owncast_grant (active->revoked, audit-preserving); this
+          table is the moderator-action journal layered ON TOP, so a moderator's hide/kill/
+          restore is traceable even when (for a hide) no owncast_grant row changes.
+        - DOMAIN-scoped: the domain is the MODERATOR's brand, derived SERVER-SIDE from the
+          validated issuer (NEVER a request field) — a row records an action WITHIN one brand
+          only, consistent with the rest of owncast-bff's domain-scoped tables.
+        - action CHECK IN ('kill','hide','restore'): the three mod operations. 'kill' writes
+          an owncast_grant(banned) AND forces the stream internal; 'hide' forces the stream
+          internal only; 'restore' CASes the active ban active->revoked.
+
+      The cross-repo mod-bff ModActionType owncast.* wiring (so a moderation here also lands
+      in the central mod-action ledger) stays a DEFERRED follow-up; this table is the LOCAL
+      journal that gives owncast-bff its own traceability in the meantime.
+
+      ── Portable DDL ─────────────────────────────────────────────────────────
+      id is a varchar(64) holding an app-generated UUID string (portable across Postgres +
+      the H2 PostgreSQL-compat slice store WITHOUT a gen_random_uuid dependency, and the app
+      returns the new row id). timestamp with time zone -> the portable Liquibase generic
+      type so the same DDL applies on H2. Mirrors owncast_grant (004) / owncast_stream (005)
+      exactly.
+    -->
+
+    <changeSet id="006-owncast-moderation-audit" author="hugmesh">
+        <comment>owncast_moderation_audit append-only moderator-action journal (kill|hide|restore;
+                 domain == moderator brand, server-derived).</comment>
+        <createTable tableName="owncast_moderation_audit">
+            <column name="id" type="varchar(64)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- The MODERATOR's brand, derived SERVER-SIDE from the validated issuer (NEVER
+                 a request field). NOT NULL, DEFAULT 'default' so a single-tenant cluster
+                 carries the platform default domain. -->
+            <column name="domain" type="varchar(64)" defaultValue="default">
+                <constraints nullable="false"/>
+            </column>
+            <!-- The acting MODERATOR's Casdoor subject. -->
+            <column name="actor_subject" type="varchar(400)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- The TARGET streamer/owner's Casdoor subject the action was taken against. -->
+            <column name="target_subject" type="varchar(400)">
+                <constraints nullable="false"/>
+            </column>
+            <!-- kill | hide | restore (CHECK-constrained below). -->
+            <column name="action" type="varchar(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="reason" type="varchar(1024)"/>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="006-owncast-moderation-audit-action-check" author="hugmesh">
+        <comment>CHECK: action is one of the three moderator operations.</comment>
+        <sql>
+            ALTER TABLE owncast_moderation_audit
+                ADD CONSTRAINT ck_owncast_moderation_audit_action
+                CHECK (action IN ('kill', 'hide', 'restore'))
+        </sql>
+        <rollback>ALTER TABLE owncast_moderation_audit DROP CONSTRAINT ck_owncast_moderation_audit_action</rollback>
+    </changeSet>
+
+    <changeSet id="006-owncast-moderation-audit-lookup-index" author="hugmesh">
+        <comment>Index the audit read path (a brand's actions against a target, newest first).</comment>
+        <createIndex tableName="owncast_moderation_audit" indexName="idx_owncast_moderation_audit_lookup">
+            <column name="domain"/>
+            <column name="target_subject"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="owncast_moderation_audit" indexName="idx_owncast_moderation_audit_lookup"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

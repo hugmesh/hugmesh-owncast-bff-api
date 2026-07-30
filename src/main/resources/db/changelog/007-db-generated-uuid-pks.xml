@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      DB-GENERATED UUID PRIMARY KEYS — the owncast-BFF migration (exemplars: merged
+      mod-bff #36, changelog 009-mod-action-db-generated-id.xml; admin-bff #133,
+      changelog 200-db-generated-uuid-pks.xml).
+
+      Decision (pinned): stop minting UUID primary keys in Java
+      (UUID.randomUUID().toString()); let Postgres generate them via a column DEFAULT and
+      read the generated id back on insert (INSERT ... RETURNING id). The column type and
+      the entity @Id type are UNCHANGED — only the SOURCE of the id moves from the app to
+      the database.
+
+      All three owncast-BFF PK tables carry a varchar id string PK that was minted in Java
+      as UUID.randomUUID().toString(). For a varchar id the DB default casts the native
+      uuid to text — (gen_random_uuid())::text — which yields the lowercase 36-char
+      hyphenated form, BYTE-IDENTICAL to UUID.randomUUID().toString() (and well within the
+      varchar(64) column width). The column type + the entity @Id type stay String; only
+      the id SOURCE moves to the DB. Each repository INSERT omits id and RETURNING id reads
+      the generated string back (the deterministic, mod-bff-proven path).
+
+      ── tables ──────────────────────────────────────────────────────────────────────
+        owncast_grant            (004) — varchar(64) id; was OwncastGrantRepository.insertActive()
+        owncast_stream           (005) — varchar(64) id; was OwncastStreamRepository.insert()
+        owncast_moderation_audit (006) — varchar(64) id; was OwncastModerationAuditRepository.insert()
+
+      Numbered 007 — one band above the current max (006). Registered LAST in
+      db.changelog-master.xml.
+
+      The H2 PostgreSQL-compat slice store (TestDatabaseConfig) has neither pgcrypto nor a
+      reliable INSERT ... RETURNING, so the prod changelog can no longer be applied over it.
+      That is exactly why the affected @DataR2dbcTest slices move to the commons
+      Testcontainers-Postgres base (PostgresTestSupport) — mirroring mod-bff #36 — so
+      gen_random_uuid() and RETURNING run for real against the same engine as production.
+    -->
+
+    <!-- FIRST: ensure gen_random_uuid() is available. Built-in on PG13+, but install
+         pgcrypto defensively (idempotent + harmless if already present) — mirrors the
+         mod-bff / admin-bff exemplars' pgcrypto changeSet. Gated to PostgreSQL with a
+         dbms precondition (this repo gates its PG-only changeSets the same way — see
+         004-owncast-grant-active-unique): the test store IS Postgres and the production
+         runtime is Postgres. -->
+    <changeSet id="007-pgcrypto-extension" author="hugmesh">
+        <preConditions onFail="MARK_RAN" onError="MARK_RAN">
+            <dbms type="postgresql"/>
+        </preConditions>
+        <comment>Install pgcrypto so gen_random_uuid() is available as the
+                 DB-generated-UUID column DEFAULT. IF NOT EXISTS — idempotent.</comment>
+        <sql>CREATE EXTENSION IF NOT EXISTS pgcrypto;</sql>
+    </changeSet>
+
+    <!-- owncast_grant.id (varchar(64), changelog 004): DB-generate via
+         (gen_random_uuid())::text instead of OwncastGrantRepository minting
+         UUID.randomUUID().toString(). The column stays varchar PK; the repository INSERT
+         omits id and RETURNING id reads the generated string back. -->
+    <changeSet id="007-gen-uuid-owncast_grant" author="hugmesh">
+        <comment>DB-generate owncast_grant.id ((gen_random_uuid())::text) instead of the
+                 app minting it; INSERT omits id, RETURNING id reads it back.</comment>
+        <addDefaultValue tableName="owncast_grant"
+                         columnName="id"
+                         columnDataType="varchar(64)"
+                         defaultValueComputed="(gen_random_uuid())::text"/>
+    </changeSet>
+
+    <!-- owncast_stream.id (varchar(64), changelog 005): DB-generate via
+         (gen_random_uuid())::text instead of OwncastStreamRepository minting
+         UUID.randomUUID().toString(). -->
+    <changeSet id="007-gen-uuid-owncast_stream" author="hugmesh">
+        <comment>DB-generate owncast_stream.id ((gen_random_uuid())::text) instead of the
+                 app minting it; INSERT omits id, RETURNING id reads it back.</comment>
+        <addDefaultValue tableName="owncast_stream"
+                         columnName="id"
+                         columnDataType="varchar(64)"
+                         defaultValueComputed="(gen_random_uuid())::text"/>
+    </changeSet>
+
+    <!-- owncast_moderation_audit.id (varchar(64), changelog 006): DB-generate via
+         (gen_random_uuid())::text instead of OwncastModerationAuditRepository minting
+         UUID.randomUUID().toString(). -->
+    <changeSet id="007-gen-uuid-owncast_moderation_audit" author="hugmesh">
+        <comment>DB-generate owncast_moderation_audit.id ((gen_random_uuid())::text) instead
+                 of the app minting it; INSERT omits id, RETURNING id reads it back.</comment>
+        <addDefaultValue tableName="owncast_moderation_audit"
+                         columnName="id"
+                         columnDataType="varchar(64)"
+                         defaultValueComputed="(gen_random_uuid())::text"/>
+    </changeSet>
+
+</databaseChangeLog>

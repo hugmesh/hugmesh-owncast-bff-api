@@ -1,0 +1,766 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "title" : "hugmesh-owncast-bff-api",
+    "description" : "Owncast BFF API (/bff/owncast/**) — the broadcast governance plane for the Owncast live-streaming optional service. Owns the owncast_grant grant/timeout/ban overlay (cloned from wiki_access): DEFAULT-DENY broadcast enforced at request time by OwncastBroadcastGuard (an active broadcast grant AND NOT an active ban, precedence ban>grant, SUPERADMIN exempt); the owncast_stream owner-controlled self-visibility surface (/bff/owncast/user/stream) with a gated playbackUrl; and the /bff/owncast/mod moderation surface (list/hide/kill/restore) with its own owncast_moderation_audit journal. Grant/timeout/ban/restore gated OWNCAST_GOVERN (admin|superadmin); list-all/history gated OWNCAST_MANAGE (superadmin); moderation gated MOD|admin|superadmin. All surfaces are domain-scoped per multi-brand: a scoped ADMIN governs only own-brand streamers. The per-streamer Owncast media instances (RTMP/HLS) are SEPARATE Deployments, not this BFF.",
+    "version" : "0.2.0"
+  },
+  "servers" : [ {
+    "url" : "",
+    "description" : "Generated server url"
+  } ],
+  "tags" : [ {
+    "name" : "Owncast Broadcast Access",
+    "description" : "Owncast broadcast grant/timeout/ban overlay (owncast_grant): grant/timeout/ban/restore (OWNCAST_GOVERN), list-all/history (OWNCAST_MANAGE). Domain-scoped; broadcast is DEFAULT-DENY, enforced at request time by OwncastBroadcastGuard (an active grant AND NOT an active ban, SUPERADMIN exempt)."
+  }, {
+    "name" : "Owncast Moderation",
+    "description" : "Owncast moderation surface (/bff/owncast/mod): list a brand's streams (with each owner's active-ban flag), hide (force internal), kill/ban (owncast_grant banned + hide), restore (lift the ban). MOD|ADMIN|SUPERADMIN; authority is the MOD role + domain match, NOT ownership. Domain + moderator identity server-derived from the JWT; ban/restore reuse owncast_grant; kill/hide/ban/restore ONLY (no grant/govern path)."
+  }, {
+    "name" : "Owncast Stream (self)",
+    "description" : "A streamer's OWN stream + self-visibility (owncast_stream): get/upsert title+description, flip visibility internal<->public. Owner + brand server-derived from the JWT. A PUBLIC flip is gated server-side on an active broadcast grant (OwncastBroadcastGuard); ROLE_OWNCAST floor."
+  } ],
+  "paths" : {
+    "/bff/owncast/user/stream" : {
+      "get" : {
+        "tags" : [ "Owncast Stream (self)" ],
+        "summary" : "Get the CALLING streamer's OWN stream (owner == JWT subject, brand server-derived). 404 if the streamer has no stream yet.",
+        "operationId" : "getMyStream",
+        "responses" : {
+          "200" : {
+            "description" : "Own stream returned",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_OWNCAST"
+          },
+          "404" : {
+            "description" : "Streamer has no stream yet"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Owncast Stream (self)" ],
+        "summary" : "Create-or-update the CALLING streamer's OWN stream title + description. A first upsert creates the stream visibility=internal (fail-closed); visibility is changed only via the visibility endpoint. Owner + brand server-derived.",
+        "operationId" : "upsertMyStream",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Upsert"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Stream created or updated; visibility unchanged",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Validation failed — missing/invalid field"
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_OWNCAST"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/user/stream/visibility" : {
+      "put" : {
+        "tags" : [ "Owncast Stream (self)" ],
+        "summary" : "Flip the CALLING streamer's OWN stream visibility to 'public' or 'internal'. A flip to PUBLIC is ALLOWED ONLY when the owner currently holds an active broadcast grant (403 otherwise; SUPERADMIN exempt); a flip to INTERNAL is always allowed. 404 if the streamer has no stream yet. Owner + brand server-derived.",
+        "operationId" : "setMyStreamVisibility",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Visibility"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Visibility updated",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Stream"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Validation failed — invalid visibility value"
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Public flip denied — no active broadcast grant (OwncastBroadcastGuard)"
+          },
+          "404" : {
+            "description" : "Streamer has no stream yet"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/mod/streams/{ownerSubject}/restore" : {
+      "post" : {
+        "tags" : [ "Owncast Moderation" ],
+        "summary" : "RESTORE a target owner: CAS the active broadcast ban active->revoked (the row is retained = audit). Does NOT auto-republish — the owner re-chooses visibility. MOD|ADMIN|SUPERADMIN.",
+        "operationId" : "restoreStream",
+        "parameters" : [ {
+          "name" : "ownerSubject",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ModAction"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Broadcast ban revoked (row retained for audit); owner must re-choose visibility",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_MOD, ROLE_ADMIN, or ROLE_SUPERADMIN"
+          },
+          "404" : {
+            "description" : "No active broadcast ban found for this owner"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/mod/streams/{ownerSubject}/hide" : {
+      "post" : {
+        "tags" : [ "Owncast Moderation" ],
+        "summary" : "HIDE a target owner's stream: force visibility=internal in the moderator's brand (authority = MOD role + domain match, NOT ownership). 404 if the target has no stream in this brand. MOD|ADMIN|SUPERADMIN.",
+        "operationId" : "hideStream",
+        "parameters" : [ {
+          "name" : "ownerSubject",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ModAction"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Stream visibility forced to internal; audit row written",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_MOD, ROLE_ADMIN, or ROLE_SUPERADMIN"
+          },
+          "404" : {
+            "description" : "Target owner has no stream in the moderator's brand"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/mod/streams/{ownerSubject}/ban" : {
+      "post" : {
+        "tags" : [ "Owncast Moderation" ],
+        "summary" : "KILL a target owner's stream: write owncast_grant(banned) active (the existing OwncastBroadcastGuard ban>grant then blocks the owner's public broadcast) AND force the stream internal. Audit-preserving (never hard-delete). MOD|ADMIN|SUPERADMIN.",
+        "operationId" : "banStream",
+        "parameters" : [ {
+          "name" : "ownerSubject",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ModAction"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Stream banned (owncast_grant banned written) and forced internal; audit row written",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActionResult"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_MOD, ROLE_ADMIN, or ROLE_SUPERADMIN"
+          },
+          "404" : {
+            "description" : "Target owner has no stream in the moderator's brand"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/admin/access/timeout" : {
+      "post" : {
+        "tags" : [ "Owncast Broadcast Access" ],
+        "summary" : "TIMEOUT a USER from broadcast for a bounded window (an active banned override with a future expires_at; auto-restores on expiry). ADMIN/SUPERADMIN, own-brand.",
+        "operationId" : "timeout",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Timeout"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Broadcast timeout created (or returned unchanged if already active)",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Access"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Validation failed — missing/invalid field, or a SUPERADMIN write in multi-brand mode without a known targetDomain (fail-closed)"
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_ADMIN or ROLE_SUPERADMIN"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/admin/access/grant" : {
+      "post" : {
+        "tags" : [ "Owncast Broadcast Access" ],
+        "summary" : "GRANT a USER permanent may-broadcast access (an active owncast_grant broadcast override) — the ONLY way to confer broadcast (default-deny). ADMIN/SUPERADMIN, own-brand.",
+        "operationId" : "grant",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GrantOrBan"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Broadcast grant created (or returned unchanged if already active)",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Access"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Validation failed — missing/invalid field, or a SUPERADMIN write in multi-brand mode without a known targetDomain (fail-closed)"
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_ADMIN or ROLE_SUPERADMIN"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/admin/access/ban" : {
+      "post" : {
+        "tags" : [ "Owncast Broadcast Access" ],
+        "summary" : "BAN a USER from broadcast permanently (an active banned override, expires_at NULL). Denies even an active grantee (ban>grant). ADMIN/SUPERADMIN, own-brand.",
+        "operationId" : "ban",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GrantOrBan"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Broadcast ban created (or returned unchanged if already active)",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Access"
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "Validation failed — missing/invalid field, or a SUPERADMIN write in multi-brand mode without a known targetDomain (fail-closed)"
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_ADMIN or ROLE_SUPERADMIN"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/superadmin/access" : {
+      "get" : {
+        "tags" : [ "Owncast Broadcast Access" ],
+        "summary" : "List all ACTIVE owncast_grant overrides (scoped to the caller's brand; SUPERADMIN sees all). SUPERADMIN.",
+        "operationId" : "listActive",
+        "responses" : {
+          "200" : {
+            "description" : "Active overrides list returned",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccessList"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_SUPERADMIN"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/superadmin/access/{userSubject}/history" : {
+      "get" : {
+        "tags" : [ "Owncast Broadcast Access" ],
+        "summary" : "The full grant/timeout/ban HISTORY (active + revoked = audit) for a principal (scoped to the caller's brand; SUPERADMIN sees all). SUPERADMIN.",
+        "operationId" : "history",
+        "parameters" : [ {
+          "name" : "userSubject",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Full history (active + revoked) returned",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AccessList"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_SUPERADMIN"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/mod/streams" : {
+      "get" : {
+        "tags" : [ "Owncast Moderation" ],
+        "summary" : "List the streams in the MODERATOR's brand (domain server-derived). Each row: ownerSubject, title, visibility, and whether the owner currently holds an active broadcast BAN (owncast_grant). MOD|ADMIN|SUPERADMIN.",
+        "operationId" : "listModerationStreams",
+        "responses" : {
+          "200" : {
+            "description" : "Stream list returned for the moderator's brand",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/StreamList"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_MOD, ROLE_ADMIN, or ROLE_SUPERADMIN"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    },
+    "/bff/owncast/admin/access/{accessType}/{userSubject}" : {
+      "delete" : {
+        "tags" : [ "Owncast Broadcast Access" ],
+        "summary" : "RESTORE/REVOKE: lift the active override of a type for a user (CAS active->revoked; the row is retained = audit). accessType = broadcast|banned: revoke 'banned' to restore broadcast; revoke 'broadcast' to remove a grant. ADMIN/SUPERADMIN, own-brand.",
+        "operationId" : "revoke",
+        "parameters" : [ {
+          "name" : "accessType",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "userSubject",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Override revoked (row retained for audit)",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "object"
+                  }
+                }
+              }
+            }
+          },
+          "400" : {
+            "description" : "accessType must be 'broadcast' or 'banned'"
+          },
+          "401" : {
+            "description" : "Unauthenticated"
+          },
+          "403" : {
+            "description" : "Caller lacks ROLE_ADMIN or ROLE_SUPERADMIN"
+          },
+          "500" : {
+            "description" : "Unexpected server error"
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "Upsert" : {
+        "type" : "object",
+        "properties" : {
+          "title" : {
+            "maxLength" : 256,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "description" : {
+            "maxLength" : 2048,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "Stream" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "domain" : {
+            "type" : "string"
+          },
+          "userSubject" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "visibility" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "playbackUrl" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Visibility" : {
+        "required" : [ "visibility" ],
+        "type" : "object",
+        "properties" : {
+          "visibility" : {
+            "maxLength" : 16,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "ModAction" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "maxLength" : 1024,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "ActionResult" : {
+        "type" : "object",
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "ownerSubject" : {
+            "type" : "string"
+          },
+          "domain" : {
+            "type" : "string"
+          },
+          "visibility" : {
+            "type" : "string"
+          },
+          "banned" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "Timeout" : {
+        "required" : [ "userSubject" ],
+        "type" : "object",
+        "properties" : {
+          "userSubject" : {
+            "maxLength" : 400,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "ttlSeconds" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "reason" : {
+            "maxLength" : 1024,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "targetDomain" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "Access" : {
+        "type" : "object",
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "domain" : {
+            "type" : "string"
+          },
+          "userSubject" : {
+            "type" : "string"
+          },
+          "accessType" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "grantedBySubject" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "revokedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "GrantOrBan" : {
+        "required" : [ "userSubject" ],
+        "type" : "object",
+        "properties" : {
+          "userSubject" : {
+            "maxLength" : 400,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 1024,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "targetDomain" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }
+      },
+      "AccessList" : {
+        "type" : "object",
+        "properties" : {
+          "access" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Access"
+            }
+          }
+        }
+      },
+      "StreamList" : {
+        "type" : "object",
+        "properties" : {
+          "streams" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/StreamRow"
+            }
+          }
+        }
+      },
+      "StreamRow" : {
+        "type" : "object",
+        "properties" : {
+          "ownerSubject" : {
+            "type" : "string"
+          },
+          "domain" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "visibility" : {
+            "type" : "string"
+          },
+          "banned" : {
+            "type" : "boolean"
+          }
+        }
+      }
+    }
+  }
+}

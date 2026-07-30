@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.29.xsd">
+
+    <!--
+      owncast_stream — the per-streamer SELF-VISIBILITY row (PR3). One row per (domain,
+      user_subject) is the streamer's OWN stream descriptor: their title/description and the
+      visibility flag the streamer themselves flip between 'internal' (visible only inside
+      the brand) and 'public' (federated / vanity-cut visible). It is the OWNER-controlled
+      sibling of owncast_grant (the ADMIN-controlled may-broadcast governance overlay):
+
+        - OWNER-scoped: the row's user_subject == the controlling streamer's Casdoor sub;
+          the service derives both the owner (== jwt.sub) and the domain (== validated
+          issuer) SERVER-SIDE — neither is ever a request field, so a user can only ever
+          read/modify THEIR OWN stream in THEIR OWN brand.
+        - ONE stream per streamer per brand: a UNIQUE (domain, user_subject) — at most one
+          owncast_stream row for a given streamer in a given brand.
+        - visibility CHECK IN ('public','internal'), DEFAULT 'internal' (fail-closed: a new
+          stream is brand-internal until the streamer makes it public). The SERVICE additionally
+          gates a public flip on the owner holding an active BROADCAST grant (OwncastBroadcastGuard) —
+          a user without a broadcast grant can keep an internal stream but cannot make it public.
+        - DOMAIN-scoped: a stream in brand X is invisible to brand Y (the same UNIQUE +
+          owner pair is independent per brand).
+
+      ── Portable DDL ─────────────────────────────────────────────────────────
+      id is a varchar(64) holding an app-generated UUID string (portable across Postgres +
+      the H2 PostgreSQL-compat slice store WITHOUT a gen_random_uuid dependency, and the app
+      returns the new row id). timestamp with time zone -> the portable Liquibase generic
+      type so the same DDL applies on H2. Mirrors owncast_grant (004) exactly.
+
+      The streamer-ConfigMap reconciler / ApplicationSet feed + the stream-key Secret mint
+      are a DEFERRED generator-gated follow-up — this changeset is the BFF-side self-visibility
+      table ONLY.
+    -->
+
+    <changeSet id="005-owncast-stream" author="hugmesh">
+        <comment>owncast_stream per-streamer self-visibility row (owner-controlled; one per
+                 streamer per brand).</comment>
+        <createTable tableName="owncast_stream">
+            <column name="id" type="varchar(64)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- The brand/tenant the stream belongs to, derived SERVER-SIDE from the
+                 streamer's validated-issuer brand (NEVER a request field). NOT NULL,
+                 DEFAULT 'default' so a single-tenant cluster carries the platform
+                 default domain. -->
+            <column name="domain" type="varchar(64)" defaultValue="default">
+                <constraints nullable="false"/>
+            </column>
+            <!-- The OWNING streamer's Casdoor subject (== jwt.sub). UNIQUE per domain
+                 (one stream per streamer per brand). -->
+            <column name="user_subject" type="varchar(400)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="varchar(256)"/>
+            <column name="description" type="varchar(2048)"/>
+            <!-- public | internal (CHECK-constrained below); DEFAULT internal (fail-closed:
+                 brand-internal until the streamer makes it public, and the service gates a
+                 public flip on an active broadcast grant). -->
+            <column name="visibility" type="varchar(16)" defaultValue="internal">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="timestamp with time zone" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="timestamp with time zone" defaultValueComputed="now()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="005-owncast-stream-visibility-check" author="hugmesh">
+        <comment>CHECK: visibility is one of the two values the service writes.</comment>
+        <sql>
+            ALTER TABLE owncast_stream
+                ADD CONSTRAINT ck_owncast_stream_visibility
+                CHECK (visibility IN ('public', 'internal'))
+        </sql>
+        <rollback>ALTER TABLE owncast_stream DROP CONSTRAINT ck_owncast_stream_visibility</rollback>
+    </changeSet>
+
+    <!--
+      UNIQUE (domain, user_subject): at most ONE owncast_stream per streamer per brand
+      (one-stream-per-streamer). Unlike owncast_grant's PARTIAL unique (active rows only),
+      this is a plain composite UNIQUE — owncast_stream has no active/revoked lifecycle, so
+      H2 supports it directly (no dbms precondition needed).
+    -->
+    <changeSet id="005-owncast-stream-owner-unique" author="hugmesh">
+        <comment>UNIQUE: one owncast_stream per (domain, user_subject) — one stream per
+                 streamer per brand.</comment>
+        <addUniqueConstraint tableName="owncast_stream"
+                             columnNames="domain, user_subject"
+                             constraintName="uq_owncast_stream_owner"/>
+        <rollback>
+            <dropUniqueConstraint tableName="owncast_stream"
+                                  constraintName="uq_owncast_stream_owner"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
