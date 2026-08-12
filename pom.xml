@@ -37,7 +37,7 @@
          this repo's deleted local copies of security.{Roles,DomainRegistry,DomainScope,
          CasdoorAuthorities} + config.TenancyResourceServerConfig + web.ApiException. -->
     <dependency>
-      <groupId>systems.hugmesh</groupId>
+      <groupId>net.hugmesh</groupId>
       <artifactId>hugmesh-commons</artifactId>
     </dependency>
 
@@ -48,7 +48,7 @@
          TestDatabaseConfig that breaks under Boot 4. Published as a test-jar; the
          version is parent-managed so no <version> is needed here. -->
     <dependency>
-      <groupId>systems.hugmesh</groupId>
+      <groupId>net.hugmesh</groupId>
       <artifactId>hugmesh-commons</artifactId>
       <version>2.1.0</version>
       <classifier>tests</classifier>

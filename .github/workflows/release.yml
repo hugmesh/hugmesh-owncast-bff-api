@@ -24,8 +24,8 @@ jobs:
           java-version: "25"
 
       # `-s settings.xml` points Maven at the org's gitlab-maven GROUP registry so the
-      # PRIVATE systems.hugmesh:hugmesh-parent / hugmesh-commons artifacts resolve
-      # (they are not on Maven Central). Auth is a GitLab CI_JOB_TOKEN -- this has
+      # PRIVATE systems.hugmesh:hugmesh-parent / net.hugmesh:hugmesh-commons artifacts
+      # resolve (they are not on Maven Central). Auth is a GitLab CI_JOB_TOKEN -- this has
       # nothing to authenticate with until that secret is populated, which is expected
       # for an inert workflow_dispatch-only release job.
       - name: Run tests
@@ -59,7 +59,7 @@ jobs:
         id: vars
         run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
-      # The Dockerfile's build stage resolves the PRIVATE systems.hugmesh:hugmesh-commons
+      # The Dockerfile's build stage resolves the PRIVATE net.hugmesh:hugmesh-commons
       # Maven artifact via the committed settings.xml, against the org's GitLab Maven
       # Package Registry, authenticated with a GitLab CI_JOB_TOKEN passed in as a
       # BuildKit secret (never a build-arg, never baked into a layer) -- same contract

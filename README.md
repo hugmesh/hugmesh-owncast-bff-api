@@ -13,7 +13,7 @@ of per-streamer Owncast media instances. It is a sibling of
 [`hugmesh-forum-bff-api`](https://github.com/hugmesh-net/hugmesh-forum-bff-api),
 built on the same stack: Spring Boot 4.0 on Java 25, WebFlux, R2DBC Postgres,
 Liquibase, and a Casdoor JWT resource server, under the package
-`systems.hugmesh.owncastbff`.
+`net.hugmesh.owncastbff`.
 
 Its companion frontend is [`hugmesh-owncast-ui`](https://github.com/hugmesh-net/hugmesh-owncast-ui).
 
@@ -338,7 +338,7 @@ Build and test: `./mvnw -DskipITs test`. CI runs on GitLab (`.gitlab-ci.yml`):
 `test` → `build` → `pentest` stages.
 
 The full-context `@SpringBootTest` integration tests extend the shared
-`systems.hugmesh.commons.testsupport.PostgresTestSupport` (from the
+`net.hugmesh.commons.testsupport.PostgresTestSupport` (from the
 `hugmesh-commons` test-jar), which boots a real per-class **Testcontainers**
 Postgres — so a Docker daemon is required for `./mvnw test` (the `test:unit` CI
 job runs a `docker:dind` service). The `@DataR2dbcTest` repository/service

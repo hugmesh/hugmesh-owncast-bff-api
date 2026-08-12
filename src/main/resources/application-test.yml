@@ -1,5 +1,5 @@
 # Test profile overrides. Full-context @SpringBootTest tests now extend the shared
-# systems.hugmesh.commons.testsupport.PostgresTestSupport base, which boots a real
+# net.hugmesh.commons.testsupport.PostgresTestSupport base, which boots a real
 # per-class Testcontainers Postgres and wires spring.r2dbc.url + spring.liquibase.url
 # (and credentials) to it via @DynamicPropertySource. So the REAL R2dbc + Liquibase
 # auto-config must be ACTIVE here (it builds the ConnectionFactory + runs the
