@@ -24,7 +24,7 @@ jobs:
           java-version: "25"
 
       # `-s settings.xml` points Maven at the org's gitlab-maven GROUP registry so the
-      # PRIVATE systems.hugmesh:hugmesh-parent / net.hugmesh:hugmesh-commons artifacts
+      # PRIVATE net.hugmesh:hugmesh-parent / net.hugmesh:hugmesh-commons artifacts
       # resolve (they are not on Maven Central). Auth is a GitLab CI_JOB_TOKEN -- this has
       # nothing to authenticate with until that secret is populated, which is expected
       # for an inert workflow_dispatch-only release job.
