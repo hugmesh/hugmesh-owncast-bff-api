@@ -15,7 +15,7 @@ SHELL := /bin/bash
 # Where the generator pen-test harness lives (cloned alongside this repo by
 # default; override to point at a vendored / fetched copy).
 PENTEST_HARNESS_DIR ?= ../hugmesh-generator/tests/pentest
-PENTEST_GENERATOR_REPO ?= https://github.com/hugmesh-net/hugmesh-generator.git
+PENTEST_GENERATOR_REPO ?= https://github.com/hugmesh/hugmesh-generator.git
 
 # Dependency-Check image used when no local ./mvnw is usable (matches CI's
 # public-image-only toolchain posture).
