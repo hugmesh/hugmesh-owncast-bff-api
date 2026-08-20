@@ -8,7 +8,7 @@
 # hidden .pentest-* jobs from the generator. Single source of truth org-wide; the
 # pentest:* jobs below `extends:` these. See hugmesh-pentest-standard.
 include:
-  - project: 'HugMesh/hugmesh-generator'
+  - project: 'hugmesh/hugmesh-generator'
     ref: main
     file: '/tests/pentest/ci/pentest-stage.gitlab-ci.yml'
 
