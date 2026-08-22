@@ -2,7 +2,7 @@
 
 This is the owncast-BFF's copy of a reference pattern also used across the other
 HugMesh BFFs (originally built in
-[`hugmesh-gateway`](https://github.com/hugmesh-net/hugmesh-gateway)) for proving
+[`hugmesh-gateway`](https://github.com/hugmesh/hugmesh-gateway)) for proving
 a Spring WebFlux OAuth2 resource server correctly handles per-brand (multi-issuer)
 Casdoor tokens, with the security property that matters most: an unknown issuer
 fails **closed** (401), and a token from one brand can never authenticate as
