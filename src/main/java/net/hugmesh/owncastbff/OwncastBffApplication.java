@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
  * Owncast BFF — the broadcast GOVERNANCE plane of the Owncast live-streaming optional
- * service (x86 + GPU-dependent, ships DEFAULT-OFF). It owns the {@code owncast_grant}
+ * service (x86 + GPU-dependent, is shipped disabled by default). It owns the {@code owncast_grant}
  * desired-state overlay (PR2) — the per-principal may-broadcast grant/timeout/ban
  * records that gate whether a (domain-controlled) user's stream may be broadcast — and
  * (PR3) the {@code owncast_stream} self-visibility table + own-visibility flip, shipped.

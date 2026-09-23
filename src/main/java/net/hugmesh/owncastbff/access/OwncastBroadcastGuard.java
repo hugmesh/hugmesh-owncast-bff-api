@@ -24,7 +24,7 @@ import java.util.List;
  *
  * <p>A static {@code @PreAuthorize} on the controller CANNOT consult the DB for a
  * per-principal grant or ban, so — exactly as wiki-bff / admin-bff enforce their overlays
- * at request time rather than leaving them inert — this guard is invoked programmatically
+ * at request time rather than leaving them inactive — this guard is invoked programmatically
  * by the broadcast-affecting endpoints, loads the principal's {@code owncast_grant} rows
  * for their brand, and decides:
  *
@@ -81,6 +81,12 @@ public class OwncastBroadcastGuard {
                 .collectList()
                 .flatMap(OwncastBroadcastGuard::enforceBroadcastPrecedence);
     }
+
+    /**
+     * Enforce ban &gt; grant &gt; default-deny precedence over the caller's effective grant rows.
+     * Returns an empty Mono (allowed) when a broadcast grant is active and no ban is present;
+     * errors with 403 when banned or when no grant exists (default-deny).
+     */
 
     /**
      * Enforce ban &gt; grant &gt; default-deny precedence over the caller's effective grant rows.
