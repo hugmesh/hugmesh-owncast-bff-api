@@ -25,7 +25,7 @@ public final class OwncastStreamDto {
      * populated ONLY for a caller PERMITTED to view the stream (the existing broadcast/
      * visibility gate in {@code OwncastStreamService}), and {@code null} otherwise so the media
      * endpoint is never leaked to an unauthorized or cross-tenant caller. It is also
-     * {@code null} when no playback URL template is configured (dark by default).
+     * {@code null} when no playback URL template is configured (disabled by default).
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Stream(String id, String domain, String userSubject, String title,
