@@ -28,7 +28,7 @@ bearer** both 401.
 
 ---
 
-## The two reusable seams (copied from the gateway, package adjusted)
+## The two reusable extension points (copied from the gateway, package adjusted)
 
 ### 1. `TestIssuer` — `src/test/java/.../testsupport/TestIssuer.java`
 

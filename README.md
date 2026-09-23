@@ -44,7 +44,7 @@ under `src/test`:
 - ✅ **Shipped and tested**: the `owncast_grant` broadcast grant/timeout/ban overlay
   with `OwncastBroadcastGuard` default-deny enforcement; `owncast_stream`
   owner-controlled self-visibility (get/upsert plus a gated public/internal flip)
-  with a dark-by-default `playbackUrl`; the `/bff/owncast/mod` moderation surface
+  with a hidden-by-default `playbackUrl`; the `/bff/owncast/mod` moderation surface
   (list/hide/kill/restore) with its own append-only `owncast_moderation_audit`
   journal; database-generated UUID primary keys on all three tables; hardened
   OWASP/NIST response headers; an opt-in multi-issuer (per-brand Casdoor) resource
@@ -177,7 +177,7 @@ fields.
     endpoint, formatted by `OwncastPlaybackUrlResolver` from
     `owncast.playback.url-template`). It is populated only when the same
     broadcast/visibility gate that governs going public allows the caller
-    (active grant and not banned, SUPERADMIN exempt) — and is dark by default:
+    (active grant and not banned, SUPERADMIN exempt) — and is hidden by default:
     `null` until an operator configures the template, never leaked to a denied
     caller.
   - `PUT` — create or update the caller's own `title` / `description`; a first
@@ -185,7 +185,7 @@ fields.
     changed only through the dedicated visibility endpoint).
   - `PUT /visibility` — flip the caller's own visibility between `internal` and
     `public`.
-- **The load-bearing rule:** a flip to **public** is allowed only while the owner
+- **The critical rule:** a flip to **public** is allowed only while the owner
   holds an active broadcast grant. `OwncastStreamService.setVisibility` calls
   `OwncastBroadcastGuard.assertCanBroadcast` before writing and propagates any
   403 the guard raises (default-deny; an active ban blocks even a grantee;
@@ -329,7 +329,7 @@ hop.
   while the user holds an active broadcast grant (default-deny; SUPERADMIN
   exempt).
 
-The service ships **off by default** and is GPU-pinned (x86 + GPU dependent) —
+The service is **off by default** and is GPU-pinned (x86 + GPU dependent) —
 see the [Roadmap](#roadmap) for the per-domain enable path.
 
 ## Build, test and CI
