@@ -25,7 +25,7 @@ import java.util.List;
  * assertions cover the actual wired behaviour, not a hand-rolled writer.
  *
  * <p>This BFF is a pure-JSON resource server that always sits behind the
- * hugmesh-gateway front door, so it deliberately does NOT emit
+ * hugmesh-gateway (the public entry point), so it deliberately does NOT emit
  * {@code Strict-Transport-Security} (meaningless over a plaintext intra-mesh hop —
  * HSTS lives only at the TLS edge) nor the UI-shell {@code Permissions-Policy} (no
  * document to govern). Those belong at the gateway.

@@ -22,11 +22,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * REUSABLE multi-issuer test fixture — the cornerstone of the copyable multi-issuer
- * security-slice pattern (see {@code docs/testing/MULTI-ISSUER-SLICE.md}). COPIED
- * VERBATIM from the adversarially-verified-safe hugmesh-gateway
- * {@code net.hugmesh.gateway.testsupport.TestIssuer} (package adjusted), so the
- * owncast BFF proves the SAME fail-closed multi-issuer property the gateway proves.
+ * Multi-issuer test fixture for proving that brand isolation works the same way in
+ * this BFF as in the gateway (see {@code docs/testing/MULTI-ISSUER-SLICE.md}). This
+ * class is copied verbatim from hugmesh-gateway {@code net.hugmesh.gateway.testsupport.TestIssuer}
+ * (package adjusted only), so the owncast BFF and gateway behavior is identical.
  *
  * <p>Each {@code TestIssuer} stands up a tiny in-process HTTP server (JDK
  * {@link HttpServer}, bound to {@code 127.0.0.1}) that serves exactly what Spring

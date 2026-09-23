@@ -55,8 +55,6 @@ class OwncastBroadcastServiceTest extends PostgresTestSupport {
             "https://id.brandx.example=brandx,https://id.brandy.example=brandy");
 
     private static final AtomicInteger SEQ = new AtomicInteger();
-    // Class-unique prefix (see OwncastGrantRepositoryTest): the slice tests share one
-    // cached context + H2 store, so prefix this class's subjects to avoid collisions.
     private String user(String tag) { return "svc-" + tag + "-" + SEQ.incrementAndGet(); }
 
     @BeforeEach

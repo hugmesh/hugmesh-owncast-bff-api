@@ -22,10 +22,9 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 
 /**
- * The broadcast grant / timeout / ban OVERLAY surface — the write side of the
+ * The broadcast grant / timeout / ban overlay surface — the write side of the
  * {@code owncast_grant} desired-state that {@link OwncastBroadcastGuard} enforces
- * (DEFAULT-DENY) on the broadcast path. CLONED in role model from the wiki-bff
- * {@code WikiAccessController}.
+ * (DEFAULT-DENY) on the broadcast path.
  *
  * <p><b>ROLE MODEL.</b> {@code ROLE_OWNCAST} is the base service role (sibling of
  * {@code ROLE_WIKI} / {@code ROLE_FORUM}) — the gateway route-access floor for the
@@ -58,8 +57,7 @@ public class OwncastBroadcastController {
     public static final String OWNCAST_GOVERN = "hasRole('ADMIN') or hasRole('SUPERADMIN')";
 
     /** OWNCAST_MANAGE — manage-all of the owncast governance solution: SUPERADMIN only
-     *  (list-all + history here; the per-domain service-enable and the provisioning
-     *  effector are still 🔭 planned — see the README Roadmap). */
+     *  (list-all + history here; see the README Roadmap for planned features). */
     public static final String OWNCAST_MANAGE = "hasRole('SUPERADMIN')";
 
     private final OwncastBroadcastService access;
