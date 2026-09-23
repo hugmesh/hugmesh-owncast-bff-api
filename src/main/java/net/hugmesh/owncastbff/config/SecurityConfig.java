@@ -100,9 +100,10 @@ public class SecurityConfig {
     private final ObjectProvider<ReactiveAuthenticationManagerResolver<ServerWebExchange>>
             tenantAuthManagerResolver;
 
-    /** D8 MFA floor (fan-out from the MERGED gateway) — {@code app.mfa.enabled}
-     *  (default {@code false}: ships dark). When false the converter emits the
-     *  legacy authority set verbatim and {@code MFA_SATISFIED} is never produced. */
+    /** D8 MFA floor (from the merged gateway) — {@code app.mfa.enabled}
+     *  (default {@code false}: is present in the code but switched off by default). When false
+     *  the converter emits the legacy authority set verbatim and {@code MFA_SATISFIED} is never
+     *  produced. */
     private final boolean mfaEnabled;
 
     /** D8 MFA freshness window {@code app.mfa.freshness-window} in millis (default
@@ -144,24 +145,25 @@ public class SecurityConfig {
         // The MANAGE-ALL surface — SUPERADMIN only (OWNCAST_MANAGE: list-all + history).
         // Declared BEFORE the admin + floor prefixes so the most-specific path matches first.
         ex.pathMatchers("/bff/owncast/superadmin/**").hasRole("SUPERADMIN");
-        // The OWNCAST_GOVERN grant/timeout/ban/restore seam — ADMIN (or the cross-domain
+        // The OWNCAST_GOVERN grant/timeout/ban/restore capability — ADMIN (or the cross-domain
         // SUPERADMIN super-role) end-to-end. Admins reach it via the converter's ROLE_ADMIN;
         // SUPERADMIN reaches it via the role hierarchy edge.
         ex.pathMatchers("/bff/owncast/admin/**").hasAnyRole("ADMIN", "SUPERADMIN");
         // The STREAMER self-service surface (owncast_stream: get/upsert own stream, flip own
-        // visibility) — the ROLE_OWNCAST base service role floor. Declared BEFORE the generic
-        // /bff/owncast/** floor so this prefix is gated to ROLE_OWNCAST. OWNCAST is a SIBLING
-        // role (no SUPERADMIN>OWNCAST hierarchy edge, and path matchers don't apply hierarchy
-        // anyway), so a principal reaching this surface carries ROLE_OWNCAST — matching the
-        // gateway route-access floor. The EXTRA rule (a PUBLIC visibility flip needs an active
-        // broadcast grant, SUPERADMIN exempt) is enforced in OwncastStreamService via
-        // OwncastBroadcastGuard — NOT here, because a static SpEL cannot consult the DB.
+        // visibility) — the ROLE_OWNCAST base service role minimum level. Declared BEFORE the
+        // generic /bff/owncast/** minimum level so this prefix is gated to ROLE_OWNCAST. OWNCAST
+        // is a SIBLING role (no SUPERADMIN>OWNCAST hierarchy edge, and path matchers don't
+        // apply hierarchy anyway), so a principal reaching this surface carries ROLE_OWNCAST —
+        // matching the gateway route-access minimum level. The EXTRA rule (a PUBLIC visibility
+        // flip needs an active broadcast grant, SUPERADMIN exempt) is enforced in
+        // OwncastStreamService via OwncastBroadcastGuard — NOT here, because a static SpEL
+        // cannot consult the DB.
         ex.pathMatchers("/bff/owncast/user/**").hasRole("OWNCAST");
         // The MODERATION surface (owncast_moderation_audit + reused owncast_grant/owncast_stream:
         // list a brand's streams, hide/kill/restore a target owner) — MOD | ADMIN | SUPERADMIN.
-        // Declared BEFORE the generic /bff/owncast/** floor so this prefix is gated to the
-        // moderation roles. ADMIN and MOD are documented SIBLINGS (no ADMIN>MOD hierarchy edge,
-        // and path matchers don't apply the @PreAuthorize role hierarchy anyway), so the
+        // Declared BEFORE the generic /bff/owncast/** minimum level so this prefix is gated to
+        // the moderation roles. ADMIN and MOD are documented SIBLINGS (no ADMIN>MOD hierarchy
+        // edge, and path matchers don't apply the @PreAuthorize role hierarchy anyway), so the
         // disjunction is EXPLICIT — a MOD reaches it via the converter's ROLE_MOD, an ADMIN via
         // ROLE_ADMIN, a SUPERADMIN via ROLE_SUPERADMIN; a plain USER or a bare ROLE_OWNCAST
         // streamer is denied. The moderation verbs are kill/hide/ban/restore ONLY — a MOD cannot
@@ -181,7 +183,7 @@ public class SecurityConfig {
     /**
      * Hardened HTTP response headers — the API-DEFENSIVE MINIMUM for a pure-JSON
      * resource-server BFF (OWASP secure-headers / NIST 800-228). This BFF NEVER serves
-     * HTML or a document and ALWAYS sits behind the hugmesh-gateway front door, which
+     * HTML or a document and ALWAYS sits behind the hugmesh-gateway public entry point, which
      * emits the full browser-policy set (HSTS / Permissions-Policy / the UI-shell CSP)
      * exactly once at the single TLS-terminating PEP so all brands/BFFs inherit it and
      * the 12 per-BFF configs can't drift. So this chain re-asserts ONLY defense-in-depth:

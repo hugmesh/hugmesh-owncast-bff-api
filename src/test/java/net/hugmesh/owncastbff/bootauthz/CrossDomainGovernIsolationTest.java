@@ -26,7 +26,7 @@ import java.util.List;
  *
  * <p><b>Why this file exists (the gap).</b> WAVE-2's {@code CrossDomainDeny} proved the
  * cross-domain DENY for the MODERATION list/hide/restore surface and for revoking a brand-Y
- * <em>banned</em> override, and it PINNED the superadmin manage-all ALLOW
+ * <em>banned</em> override, and it fixed the superadmin manage-all ALLOW at
  * ({@code brandXSuperadmin_listActive_seesAllBrands_includingBrandY}). It left two gaps this
  * file closes, both as MUTATION-RESISTANT cross-domain DENY/isolation cases:
  *

@@ -81,7 +81,7 @@ public class OwncastStreamService {
     /**
      * Populate {@code playbackUrl} on {@code stream} ONLY for a caller PERMITTED to view it,
      * reusing the existing broadcast/visibility gate. When the gate ALLOWS, the URL is resolved
-     * from the (dark-by-default) template for the stream's OWN brand + owner. When the gate
+     * from the (inactive-by-default) template for the stream's OWN brand + owner. When the gate
      * DENIES (its 403) the stream is returned UNCHANGED ({@code playbackUrl} stays {@code null})
      * — so the media endpoint is never leaked to an unauthorized or cross-tenant caller.
      */

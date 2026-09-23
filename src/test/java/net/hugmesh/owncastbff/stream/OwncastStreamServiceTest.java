@@ -66,7 +66,7 @@ class OwncastStreamServiceTest extends PostgresTestSupport {
             "https://id.brandx.example=brandx,https://id.brandy.example=brandy");
     private static final PrincipalDomain PD = new PrincipalDomain(MULTI);
 
-    /** A CONFIGURED playback-URL template (the dark-by-default flag turned ON) so we can assert
+    /** A CONFIGURED playback-URL template (the inactive-by-default flag turned ON) so we can assert
      *  the URL is RESOLVED for a permitted viewer and WITHHELD (null) from a denied one. */
     private static final OwncastPlaybackUrlResolver PLAYBACK =
             new OwncastPlaybackUrlResolver("https://{domain}.example/owncast/{subject}/hls/stream.m3u8");

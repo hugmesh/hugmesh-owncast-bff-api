@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * SAME stack that runs in production — mirroring federation-api's CrossDomainWriteIsolationTest /
  * MultiIssuerSecuritySliceTest.
  *
- * <p><b>Why this file exists.</b> {@link FullChainHttpAuthzTest} pins the role-matrix ALLOW/DENY
+ * <p><b>Why this file exists.</b> {@link FullChainHttpAuthzTest} fixes the role-matrix ALLOW/DENY
  * and the moderation/govern cross-domain isolation. This suite closes the explicitly-requested
  * raw-API-deny negatives with MUTATION-RESISTANT re-reads — every denied write is followed by a
  * read-back proving the action did NOT take effect (an attacker forging a body/path field, or

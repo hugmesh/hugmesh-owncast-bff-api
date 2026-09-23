@@ -271,7 +271,7 @@ class FullChainHttpAuthzTest extends FullChainAuthzSupport {
          *  bypass returns null ONLY for SUPERADMIN, so {@code listActive(null)} would be
          *  cross-domain. We assert the SUPERADMIN listActive INCLUDES brand-Y (the documented
          *  superadmin cross-domain read) — the role boundary, not the tenant boundary, governs
-         *  the manage surface. This pins the EXACT current behaviour at the HTTP layer. */
+         *  the manage surface. This fixes the EXACT current behaviour at the HTTP layer. */
         @Test
         void brandXSuperadmin_listActive_seesAllBrands_includingBrandY() {
             getX("xsuper", List.of("superadmin"), "/bff/owncast/superadmin/access")
