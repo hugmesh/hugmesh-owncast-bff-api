@@ -43,7 +43,8 @@ public final class OwncastAccessDto {
      * brand, consulted ONLY for a SUPERADMIN cross-brand write (a scoped ADMIN's brand is
      * always issuer-derived and this field is ignored): a SUPERADMIN bans a brand-X streamer
      * by passing {@code targetDomain="brandx"} so the row lands in (and the broadcast guard
-     * matches) the victim's brand instead of the unused {@code default} domain.
+     * matches) the victim's brand instead of the {@code default} domain, where no brand's
+     * broadcast guard would ever match it.
      *
      * @param userSubject  Casdoor subject of the principal to grant or ban; required,
      *                     max 400 characters

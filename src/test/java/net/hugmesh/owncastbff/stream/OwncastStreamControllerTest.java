@@ -98,7 +98,7 @@ class OwncastStreamControllerTest {
                 .expectBody().jsonPath("$.playbackUrl").isEqualTo("/owncast/hls/index.m3u8");
     }
 
-    /** The service returns null playbackUrl (template unset = disabled by default, or no grant) →
+    /** The service returns null playbackUrl (template unset, the default, or no grant) →
      *  the field serialises as null so the UI degrades gracefully to the placeholder. */
     @Test
     void getMyStream_playbackUrlNullWhenUnconfigured() {

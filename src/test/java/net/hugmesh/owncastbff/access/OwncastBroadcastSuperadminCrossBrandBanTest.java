@@ -41,8 +41,9 @@ import static org.mockito.Mockito.when;
  * IN-MEMORY fake of {@link OwncastGrantRepository}. The fake stubs ONLY the derived-query
  * and {@code insertActiveRow} abstract methods — the {@code default} methods
  * ({@code insertActive} / {@code findActive} / {@code activeFor}), which carry the
- * load-bearing {@code DomainScope.isUnscoped(domain) -> DEFAULT_DOMAIN} coalescing that
- * produced the bug, run FOR REAL. No container is booted (the sibling slice tests need a
+ * {@code DomainScope.isUnscoped(domain) -> DEFAULT_DOMAIN} coalescing that produced the bug
+ * (and that every guard read depends on), run FOR REAL. No container is booted (the sibling
+ * slice tests need a
  * Testcontainers Postgres; this round-trip does not).
  *
  * <ul>
@@ -52,11 +53,11 @@ import static org.mockito.Mockito.when;
  *       the fix the row was {@code default} and the granted streamer kept broadcasting.</li>
  *   <li><b>FAIL-CLOSED</b> — a SUPERADMIN ban with NO/unknown {@code targetDomain} in
  *       multi-brand mode is rejected (400) and NO row is written, rather than silently
- *       stamping an inert {@code default} ban.</li>
+ *       stamping a {@code default} ban that no brand's guard would ever match.</li>
  *   <li><b>SINGLE-ISSUER UNCHANGED</b> — the legacy deployment shape still stamps
  *       {@code default} for a SUPERADMIN (no 400), and the guard still matches it.</li>
  *   <li><b>LEGIT scoped-ADMIN unchanged</b> — a brand-X ADMIN's ban still lands in their
- *       issuer-derived brand and {@code targetDomain} is inert.</li>
+ *       issuer-derived brand and {@code targetDomain} is ignored.</li>
  * </ul>
  */
 class OwncastBroadcastSuperadminCrossBrandBanTest {
@@ -114,7 +115,8 @@ class OwncastBroadcastSuperadminCrossBrandBanTest {
         Authentication superadmin = principal(ISS_X, "root", "superadmin");
         OwncastGrant row = service.ban(u, "abuse", "brandx", superadmin).block();
 
-        // The row is STAMPED with the victim brand (not the inert 'default').
+        // The row is STAMPED with the victim brand (not 'default', which no brand's guard would
+        // match).
         assertThat(row.domain())
                 .as("a SUPERADMIN cross-brand ban is stamped to the victim brand, not 'default'")
                 .isEqualTo("brandx");
@@ -154,13 +156,14 @@ class OwncastBroadcastSuperadminCrossBrandBanTest {
         String u = user("xbrand-notgt");
         Authentication superadmin = principal(ISS_X, "root", "superadmin");
 
-        // No targetDomain in multi-brand mode => 400 (rather than an inert 'default' ban).
+        // No targetDomain in multi-brand mode => 400 (rather than a 'default' ban no brand's guard
+        // would match).
         StepVerifier.create(service.ban(u, "abuse", null, superadmin))
                 .expectErrorSatisfies(e ->
                         assertThat(((ApiException) e).status().value()).isEqualTo(400))
                 .verify();
 
-        // Nothing was written in EITHER brand (no silent inert ban anywhere).
+        // Nothing was written in EITHER brand (no silent no-effect ban anywhere).
         assertThat(store).as("a fail-closed ban writes NO row at all").isEmpty();
         assertThat(repo.activeFor(u, "default").collectList().block()).isEmpty();
         assertThat(repo.activeFor(u, "brandx").collectList().block()).isEmpty();
@@ -181,7 +184,7 @@ class OwncastBroadcastSuperadminCrossBrandBanTest {
     }
 
     /** {@code default} is a back-compat sentinel, NOT a real brand: a SUPERADMIN may not
-     *  launder an inert ban through it by naming it explicitly. */
+     *  launder a no-effect ban through it by naming it explicitly. */
     @Test
     void superadminBan_targetingDefaultLiterally_failsClosed() {
         String u = user("xbrand-default");
@@ -228,7 +231,7 @@ class OwncastBroadcastSuperadminCrossBrandBanTest {
                 .verify();
     }
 
-    // ── LEGIT unchanged: scoped ADMIN bans in own brand; targetDomain inert ───
+    // ── LEGIT unchanged: scoped ADMIN bans in own brand; targetDomain ignored ─
 
     /**
      * A brand-X ADMIN's ban still lands in brandx (issuer-derived), and a

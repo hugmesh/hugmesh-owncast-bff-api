@@ -44,7 +44,8 @@ under `src/test`:
 - ✅ **Shipped and tested**: the `owncast_grant` broadcast grant/timeout/ban overlay
   with `OwncastBroadcastGuard` default-deny enforcement; `owncast_stream`
   owner-controlled self-visibility (get/upsert plus a gated public/internal flip)
-  with a hidden-by-default `playbackUrl`; the `/bff/owncast/mod` moderation surface
+  with a `playbackUrl` that stays `null` until an operator configures the URL
+  template; the `/bff/owncast/mod` moderation surface
   (list/hide/kill/restore) with its own append-only `owncast_moderation_audit`
   journal; database-generated UUID primary keys on all three tables; hardened
   OWASP/NIST response headers; an opt-in multi-issuer (per-brand Casdoor) resource
@@ -141,8 +142,8 @@ The broadcast grant/timeout/ban overlay is cloned from the wiki-bff `wiki_access
   so history is preserved for audit), `expires_at` (NULL = permanent, a future
   timestamp = a timeout that auto-restores), a partial-unique constraint on active
   `(domain, user_subject, access_type)`, and domain scoping throughout.
-- **`OwncastBroadcastGuard.assertCanBroadcast`** — the load-bearing, default-deny
-  enforcement point. Decision order:
+- **`OwncastBroadcastGuard.assertCanBroadcast`** — the default-deny
+  enforcement point every broadcast path depends on. Decision order:
   1. SUPERADMIN → immediately **allow** (exempt from ban).
   2. Load the principal's active, non-expired `owncast_grant` rows for their brand.
   3. An active ban row → **403**, even if a broadcast grant also exists (ban takes
@@ -177,7 +178,7 @@ fields.
     endpoint, formatted by `OwncastPlaybackUrlResolver` from
     `owncast.playback.url-template`). It is populated only when the same
     broadcast/visibility gate that governs going public allows the caller
-    (active grant and not banned, SUPERADMIN exempt) — and is hidden by default:
+    (active grant and not banned, SUPERADMIN exempt) — and the template is unset by default:
     `null` until an operator configures the template, never leaked to a denied
     caller.
   - `PUT` — create or update the caller's own `title` / `description`; a first
@@ -302,7 +303,7 @@ no-content `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`
 `Referrer-Policy: no-referrer`, plus Spring's reactive secure defaults
 (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Cache-Control`
 no-store). HSTS and Permissions-Policy are deliberately omitted here — they
-belong only at the gateway TLS front door, not on a plaintext intra-mesh JSON
+belong only at the gateway's TLS entry point, not on a plaintext intra-mesh JSON
 hop.
 
 ## Role model

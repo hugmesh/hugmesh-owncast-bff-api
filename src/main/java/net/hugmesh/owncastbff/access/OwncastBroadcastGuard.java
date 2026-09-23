@@ -13,9 +13,10 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * THE LOAD-BEARING enforcement of the broadcast grant/timeout/ban overlay: it resolves
- * whether a request principal may BROADCAST by reading the DYNAMIC {@code owncast_grant}
- * desired-state and applying the precedence rule. The {@code WikiAccessGuard} twin — with
+ * The enforcement point of the broadcast grant/timeout/ban overlay (every broadcast path
+ * depends on it): it resolves whether a request principal may BROADCAST by reading the
+ * DYNAMIC {@code owncast_grant} desired-state and applying the precedence rule. The
+ * {@code WikiAccessGuard} twin — with
  * ONE deliberate DELTA: broadcast is <b>DEFAULT-DENY and GRANT-ONLY</b>. Where wiki read
  * has a static role floor (ADMIN | SUPERADMIN | (MOD AND WIKI)) that the guard OR-s in,
  * broadcast has <b>NO role-qualifies path at all</b> — no role confers broadcast; an
@@ -24,7 +25,7 @@ import java.util.List;
  *
  * <p>A static {@code @PreAuthorize} on the controller CANNOT consult the DB for a
  * per-principal grant or ban, so — exactly as wiki-bff / admin-bff enforce their overlays
- * at request time rather than leaving them inactive — this guard is invoked programmatically
+ * at request time rather than leaving them unenforced — this guard is invoked programmatically
  * by the broadcast-affecting endpoints, loads the principal's {@code owncast_grant} rows
  * for their brand, and decides:
  *
@@ -34,7 +35,7 @@ import java.util.List;
  *                               AND NOT an ACTIVE non-expired BAN/TIMEOUT for this user+domain )
  * </pre>
  *
- * <p>PRECEDENCE — the load-bearing rule:
+ * <p>PRECEDENCE — the rule every decision below depends on:
  * <ul>
  *   <li>DEFAULT-DENY: no grant ⇒ cannot broadcast (no role ever substitutes for the grant);</li>
  *   <li>an ACTIVE non-expired BAN/TIMEOUT DENIES even a principal who holds an active
@@ -81,12 +82,6 @@ public class OwncastBroadcastGuard {
                 .collectList()
                 .flatMap(OwncastBroadcastGuard::enforceBroadcastPrecedence);
     }
-
-    /**
-     * Enforce ban &gt; grant &gt; default-deny precedence over the caller's effective grant rows.
-     * Returns an empty Mono (allowed) when a broadcast grant is active and no ban is present;
-     * errors with 403 when banned or when no grant exists (default-deny).
-     */
 
     /**
      * Enforce ban &gt; grant &gt; default-deny precedence over the caller's effective grant rows.

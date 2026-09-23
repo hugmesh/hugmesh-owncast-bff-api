@@ -27,7 +27,7 @@ import net.hugmesh.commons.web.ApiException;
  *       is invisible to brand Y.</li>
  * </ul>
  *
- * <p><b>SECURITY-CRITICAL GATE (the load-bearing rule of this PR).</b> A stream may only be
+ * <p><b>SECURITY-CRITICAL GATE (the rule the rest of this PR depends on).</b> A stream may only be
  * set/kept {@code visibility=PUBLIC} if the OWNER currently holds an active BROADCAST grant.
  * A flip to PUBLIC ({@link #setVisibility}) calls {@link OwncastBroadcastGuard#assertCanBroadcast}
  * FIRST and propagates its 403 on deny — so a user WITHOUT a broadcast grant (or a banned user)
@@ -81,7 +81,7 @@ public class OwncastStreamService {
     /**
      * Populate {@code playbackUrl} on {@code stream} ONLY for a caller PERMITTED to view it,
      * reusing the existing broadcast/visibility gate. When the gate ALLOWS, the URL is resolved
-     * from the (inactive-by-default) template for the stream's OWN brand + owner. When the gate
+     * from the (unset-by-default) template for the stream's OWN brand + owner. When the gate
      * DENIES (its 403) the stream is returned UNCHANGED ({@code playbackUrl} stays {@code null})
      * — so the media endpoint is never leaked to an unauthorized or cross-tenant caller.
      */

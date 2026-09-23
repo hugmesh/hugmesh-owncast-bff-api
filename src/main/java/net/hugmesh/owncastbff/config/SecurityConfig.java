@@ -47,7 +47,7 @@ import net.hugmesh.owncastbff.security.PrincipalDomain;
  *       MANAGE-ALL surface (OWNCAST_MANAGE: list-all + history). Declared FIRST so the
  *       most-specific prefix wins.</li>
  *   <li>{@code /bff/owncast/admin/**} -> {@code hasAnyRole('ADMIN','SUPERADMIN')} — the
- *       OWNCAST_GOVERN grant/timeout/ban/restore seam. Admins reach it via the
+ *       OWNCAST_GOVERN grant/timeout/ban/restore surface. Admins reach it via the
  *       converter's ROLE_ADMIN; SUPERADMIN reaches it via the role hierarchy edge.</li>
  *   <li>{@code /bff/owncast/mod/**} -> {@code hasAnyRole('MOD','ADMIN','SUPERADMIN')} — the
  *       MODERATION surface (list a brand's streams; hide/kill/restore a target owner;
@@ -101,7 +101,7 @@ public class SecurityConfig {
             tenantAuthManagerResolver;
 
     /** D8 MFA floor (from the merged gateway) — {@code app.mfa.enabled}
-     *  (default {@code false}: is present in the code but switched off by default). When false
+     *  (default {@code false}: present in the code but switched off by default). When false
      *  the converter emits the legacy authority set verbatim and {@code MFA_SATISFIED} is never
      *  produced. */
     private final boolean mfaEnabled;
@@ -145,25 +145,24 @@ public class SecurityConfig {
         // The MANAGE-ALL surface — SUPERADMIN only (OWNCAST_MANAGE: list-all + history).
         // Declared BEFORE the admin + floor prefixes so the most-specific path matches first.
         ex.pathMatchers("/bff/owncast/superadmin/**").hasRole("SUPERADMIN");
-        // The OWNCAST_GOVERN grant/timeout/ban/restore capability — ADMIN (or the cross-domain
+        // The OWNCAST_GOVERN grant/timeout/ban/restore surface — ADMIN (or the cross-domain
         // SUPERADMIN super-role) end-to-end. Admins reach it via the converter's ROLE_ADMIN;
         // SUPERADMIN reaches it via the role hierarchy edge.
         ex.pathMatchers("/bff/owncast/admin/**").hasAnyRole("ADMIN", "SUPERADMIN");
         // The STREAMER self-service surface (owncast_stream: get/upsert own stream, flip own
-        // visibility) — the ROLE_OWNCAST base service role minimum level. Declared BEFORE the
-        // generic /bff/owncast/** minimum level so this prefix is gated to ROLE_OWNCAST. OWNCAST
-        // is a SIBLING role (no SUPERADMIN>OWNCAST hierarchy edge, and path matchers don't
-        // apply hierarchy anyway), so a principal reaching this surface carries ROLE_OWNCAST —
-        // matching the gateway route-access minimum level. The EXTRA rule (a PUBLIC visibility
-        // flip needs an active broadcast grant, SUPERADMIN exempt) is enforced in
-        // OwncastStreamService via OwncastBroadcastGuard — NOT here, because a static SpEL
-        // cannot consult the DB.
+        // visibility) — the ROLE_OWNCAST base service role floor. Declared BEFORE the generic
+        // /bff/owncast/** floor so this prefix is gated to ROLE_OWNCAST. OWNCAST is a SIBLING
+        // role (no SUPERADMIN>OWNCAST hierarchy edge, and path matchers don't apply hierarchy
+        // anyway), so a principal reaching this surface carries ROLE_OWNCAST — matching the
+        // gateway route-access floor. The EXTRA rule (a PUBLIC visibility flip needs an active
+        // broadcast grant, SUPERADMIN exempt) is enforced in OwncastStreamService via
+        // OwncastBroadcastGuard — NOT here, because a static SpEL cannot consult the DB.
         ex.pathMatchers("/bff/owncast/user/**").hasRole("OWNCAST");
         // The MODERATION surface (owncast_moderation_audit + reused owncast_grant/owncast_stream:
         // list a brand's streams, hide/kill/restore a target owner) — MOD | ADMIN | SUPERADMIN.
-        // Declared BEFORE the generic /bff/owncast/** minimum level so this prefix is gated to
-        // the moderation roles. ADMIN and MOD are documented SIBLINGS (no ADMIN>MOD hierarchy
-        // edge, and path matchers don't apply the @PreAuthorize role hierarchy anyway), so the
+        // Declared BEFORE the generic /bff/owncast/** floor so this prefix is gated to the
+        // moderation roles. ADMIN and MOD are documented SIBLINGS (no ADMIN>MOD hierarchy edge,
+        // and path matchers don't apply the @PreAuthorize role hierarchy anyway), so the
         // disjunction is EXPLICIT — a MOD reaches it via the converter's ROLE_MOD, an ADMIN via
         // ROLE_ADMIN, a SUPERADMIN via ROLE_SUPERADMIN; a plain USER or a bare ROLE_OWNCAST
         // streamer is denied. The moderation verbs are kill/hide/ban/restore ONLY — a MOD cannot
@@ -196,7 +195,7 @@ public class SecurityConfig {
      *       {@code X-Content-Type-Options: nosniff}, {@code X-Frame-Options: DENY} and the
      *       {@code Cache-Control} no-store family.</li>
      * </ul>
-     * Deliberately OMITTED here (they belong only at the TLS front door, never on a
+     * Deliberately OMITTED here (they belong only at the gateway's TLS entry point, never on a
      * plaintext intra-mesh JSON hop): {@code Strict-Transport-Security} (meaningless over
      * HTTP) and {@code Permissions-Policy} / the UI-shell CSP (no document to govern).
      * This is purely ADDITIVE — no authz rule, issuer validation or CSRF posture changes.

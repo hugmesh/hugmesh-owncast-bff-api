@@ -66,7 +66,7 @@ owncast:
     # HLS playback URL template for the in-platform Owncast player.
     # Supports two placeholders: {domain} = brand/tenant, {subject} = Casdoor owner subject.
     # Example: https://{domain}.example/owncast/{subject}/hls/stream.m3u8
-    # DISABLED BY DEFAULT: leave unset (or set to the empty string) to disable the in-platform
+    # UNSET BY DEFAULT: leave unset (or set to the empty string) to disable the in-platform
     # player; the playbackUrl field will be absent from responses so the UI degrades
     # gracefully to the placeholder. Set OWNCAST_PLAYBACK_URL_TEMPLATE at deployment time.
     url-template: "${OWNCAST_PLAYBACK_URL_TEMPLATE:}"

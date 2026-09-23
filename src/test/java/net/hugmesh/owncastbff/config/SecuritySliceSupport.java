@@ -23,7 +23,7 @@ import net.hugmesh.commons.security.DomainRegistry;
  * {@link SecurityConfig#devFilterChain(ServerHttpSecurity)} (dev/test) — so this
  * support exposes both {@link #sliceClient} (prod) and {@link #devSliceClient}.
  *
- * <p>This is the load-bearing half of the copyable multi-issuer pattern (see
+ * <p>This is the half of the copyable multi-issuer pattern the rest depends on (see
  * {@code docs/testing/MULTI-ISSUER-SLICE.md}): a resource-server repo replicates the
  * slice by (1) constructing its own {@code SecurityConfig} chain the same way here,
  * (2) supplying issuer-specific tokens via

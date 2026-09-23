@@ -4,11 +4,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Resolves a streamer's per-instance Owncast HLS playback endpoint from the per-streamer
- * media-plane address template. The media plane is separate from this governance BFF: the
- * platform runs one Owncast deployment per approved streamer (HLS {@code :8080} behind the
+ * Resolves a streamer's per-instance Owncast HLS PLAYBACK endpoint from the per-streamer
+ * media-plane address template. The media plane is SEPARATE from this governance BFF: the
+ * platform runs one Owncast Deployment per APPROVED streamer (HLS {@code :8080} behind the
  * gateway — see the README architecture). This resolver turns the owning streamer's identity
- * (subject + brand) into the URL their viewer/player uses, without this BFF holding a stream
+ * (subject + brand) into the URL their viewer/player uses, WITHOUT this BFF holding a stream
  * key or talking to the media plane.
  *
  * <p>The template ({@code owncast.playback.url-template}) is unset by default, so

@@ -45,8 +45,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * committed file already matches the live API, and fails naming the refresh command if it
  * does not. To refresh, pass {@code -Dopenapi.spec.write=true} and commit the result.
  *
- * <p><b>Why the default is "assert":</b> a guard that must be opted into is a guard that does not run.
- * The default is "assert" to ensure the test always checks the contract, never silently rewriting it.
+ * <p><b>Why the default is "assert":</b> it used to be the reverse — write-and-pass by default,
+ * assert behind an opt-in {@code -Dopenapi.spec.check=true} that nothing ever set (the flag's only
+ * occurrence in this repo was the line that read it). So every {@code ./mvnw test} rewrote this
+ * committed contract and passed, and drift showed only as a dirty working tree.
  *
  * <p>Mirrors {@link OwncastBffApplicationContextTest}: same {@code test} profile, the
  * shared {@link PostgresTestSupport} Testcontainers-Postgres schema, and a mocked
@@ -115,7 +117,7 @@ class OpenApiSpecDumpTest extends PostgresTestSupport {
                 .as("the owncast BFF surface must be present in the dumped spec")
                 .anyMatch(p -> p.startsWith("/bff/owncast"));
 
-        // ASSERT BY DEFAULT; write only when explicitly asked (opt-in via -Dopenapi.spec.write=true).
+        // ASSERT BY DEFAULT; write only when explicitly asked (-Dopenapi.spec.write=true).
         if (!Boolean.getBoolean("openapi.spec.write")) {
             assertThat(Files.exists(SPEC_PATH))
                     .as("committed spec %s is MISSING — regenerate with "

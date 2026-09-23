@@ -8,7 +8,8 @@ import java.time.Instant;
 
 /**
  * A single {@code owncast_grant} row — the desired-state record of a per-principal
- * may-broadcast override (schema in Liquibase {@code db/changelog/004-owncast-grant.xml}).
+ * may-broadcast OVERRIDE (schema in Liquibase {@code db/changelog/004-owncast-grant.xml}).
+ * Shape copied from the wiki-bff {@code WikiAccess}, with {@code read -> broadcast}.
  *
  * <p>The overlay is the source of truth for the broadcast grant / timeout / ban model.
  * Unlike wiki read (which has a static role floor), broadcast is DEFAULT-DENY and

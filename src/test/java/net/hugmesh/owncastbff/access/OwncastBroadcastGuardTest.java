@@ -27,10 +27,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * THE LOAD-BEARING test: {@link OwncastBroadcastGuard} is the request-time enforcement
- * that makes the {@code owncast_grant} overlay NOT inert. It runs over the REAL repo + a
- * multi-brand {@link PrincipalDomain} so the issuer-derived scoping is exercised end to
- * end. Delineated per the test standard — the headline cases the design calls out, with
+ * The test the overlay depends on: {@link OwncastBroadcastGuard} is the request-time
+ * enforcement that makes the {@code owncast_grant} overlay actually take effect. It runs over
+ * the REAL repo + a multi-brand {@link PrincipalDomain} so the issuer-derived scoping is
+ * exercised end to end. Delineated per the test standard — the headline cases the design
+ * calls out, with
  * the DELTA from wiki-bff that broadcast is <b>DEFAULT-DENY and GRANT-ONLY</b> (NO role
  * substitutes for the grant):
  *
@@ -39,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       ROLE_MOD / ROLE_ADMIN — cannot broadcast.</li>
  *   <li><b>USER-SITUATIONAL — grant ALLOW</b>: a broadcast GRANT lets a plain USER in;
  *       revoking the grant removes broadcast (DENY).</li>
- *   <li><b>CROSS-USER ALLOW+DENY — the BAN precedence (load-bearing)</b>: a ban beats a
+ *   <li><b>CROSS-USER ALLOW+DENY — the BAN precedence (the key case)</b>: a ban beats a
  *       grant (ban&gt;grant).</li>
  *   <li><b>TIMEOUT</b>: denies a grantee until {@code expires_at}, then auto-allows
  *       (simulated past vs future expiry) WITHOUT a write.</li>
@@ -144,7 +145,7 @@ class OwncastBroadcastGuardTest extends PostgresTestSupport {
     @Nested
     class GrantAllow {
 
-        /** A GRANT lets a plain USER broadcast (ALLOW — the load-bearing grant path). */
+        /** A GRANT lets a plain USER broadcast (ALLOW — the main grant path). */
         @Test
         void grantedUser_gainsBroadcast() {
             String u = user("ga-granted");
@@ -170,11 +171,11 @@ class OwncastBroadcastGuardTest extends PostgresTestSupport {
         }
     }
 
-    // ── CROSS-USER ALLOW+DENY — the BAN precedence (LOAD-BEARING) ──────────────
+    // ── CROSS-USER ALLOW+DENY — the BAN precedence (THE KEY CASE) ──────────────
     @Nested
     class BanPrecedence {
 
-        /** THE load-bearing case: a ban beats a grant — an active grant + an active ban
+        /** THE key case: a ban beats a grant — an active grant + an active ban
          *  => denied (ban>grant). */
         @Test
         void ban_beatsGrant() {

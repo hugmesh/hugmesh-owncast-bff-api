@@ -16,7 +16,7 @@ import net.hugmesh.owncastbff.stream.OwncastStreamRepository;
 import net.hugmesh.commons.web.ApiException;
 
 /**
- * The MODERATION write/read surface — the load-bearing service behind {@code /bff/owncast/mod/**}.
+ * The MODERATION write/read surface — the service behind {@code /bff/owncast/mod/**}.
  * A moderator (MOD | ADMIN | SUPERADMIN) of brand X can ENUMERATE brand X's streams and force
  * a stream internal (hide), KILL a stream (ban its owner's broadcast + hide), or RESTORE (lift
  * the ban). It is the kill/hide/ban/restore-ONLY sibling of the ADMIN-controlled

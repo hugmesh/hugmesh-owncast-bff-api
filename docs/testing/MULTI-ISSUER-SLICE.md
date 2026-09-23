@@ -28,7 +28,7 @@ bearer** both 401.
 
 ---
 
-## The two reusable extension points (copied from the gateway, package adjusted)
+## The two reusable seams (copied from the gateway, package adjusted)
 
 ### 1. `TestIssuer` — `src/test/java/.../testsupport/TestIssuer.java`
 
@@ -85,4 +85,4 @@ The per-issuer resolver's allowlist is exactly `DomainRegistry.trustedIssuers()`
 is emitted** — there is no fallback "default" manager that could accept an unlisted
 brand. Scenario (b) is the regression guard that keeps it that way: a future refactor
 that introduces a default-accept (or routes an unknown `iss` to brand-X's manager)
-turns (b) red.
+makes (b) fail.

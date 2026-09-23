@@ -26,7 +26,7 @@ import java.util.List;
  *
  * <p><b>Why this file exists (the gap).</b> WAVE-2's {@code CrossDomainDeny} proved the
  * cross-domain DENY for the MODERATION list/hide/restore surface and for revoking a brand-Y
- * <em>banned</em> override, and it fixed the superadmin manage-all ALLOW at
+ * <em>banned</em> override, and it asserted the superadmin manage-all ALLOW in
  * ({@code brandXSuperadmin_listActive_seesAllBrands_includingBrandY}). It left two gaps this
  * file closes, both as MUTATION-RESISTANT cross-domain DENY/isolation cases:
  *
@@ -39,12 +39,12 @@ import java.util.List;
  *       SUPERADMIN/own-brand read). This is mutation-resistant: if {@code findActive}/{@code
  *       revoke}'s {@code domain = :domain} scope were removed, the brand-X DELETE would
  *       actually revoke the brand-Y broadcast row and the survival assertion would FAIL — so
- *       the test pins the isolation guard, not just a 200 no-op shape.</li>
+ *       the test asserts the isolation guard, not just a 200 no-op shape.</li>
  *   <li><b>A SCOPED admin cannot REACH the cross-domain manage surface — body-asserted.</b>
  *       WAVE-2 has {@code brandXAdmin_listActive_is403} (status only). Here we ALSO assert the
  *       403 carries NO body — a genuine security denial at the {@code SUPERADMIN}-only path
  *       gate that NEVER reaches the controller (so it cannot leak a brand-Y row), the exact
- *       negative counterpart to the pinned superadmin cross-domain read.</li>
+ *       negative counterpart to the asserted superadmin cross-domain read.</li>
  * </ol>
  *
  * <p>Categories per the comprehensive test standard: CROSS-USER DENY (the tenant-isolation
@@ -181,7 +181,7 @@ class CrossDomainGovernIsolationTest extends FullChainAuthzSupport {
      * /bff/owncast/superadmin/**} path gate is {@code SUPERADMIN}-only, so a scoped admin is
      * denied at the filter chain BEFORE the controller runs. Asserting the EMPTY body proves it
      * is a genuine security denial that never reached {@code listActive} (so it cannot leak a
-     * brand-Y grant) — the exact negative counterpart of the pinned superadmin cross-domain
+     * brand-Y grant) — the exact negative counterpart of the asserted superadmin cross-domain
      * read. This BODY assertion is the WAVE-2C tightening over WAVE-2's status-only
      * {@code brandXAdmin_listActive_is403}.
      */
