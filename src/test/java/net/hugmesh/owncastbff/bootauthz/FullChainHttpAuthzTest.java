@@ -330,13 +330,45 @@ class FullChainHttpAuthzTest extends FullChainAuthzSupport {
                     .jsonPath("$.domain").isEqualTo(DOMAIN_X);
         }
 
+        /** A SUPERADMIN is cross-domain (no issuer-derived scope), so in this multi-brand
+         *  fixture its grant must NAME the target brand via {@code targetDomain}; the row
+         *  then lands in exactly that brand, which is what the broadcast guard reads back. */
         @Test
         void superadmin_mayGrantBroadcast_200() {
             postX("xsuper", List.of("superadmin"), "/bff/owncast/admin/access/grant")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue("{\"userSubject\":\"grantee-s\"}")
+                    .bodyValue("{\"userSubject\":\"grantee-s\",\"targetDomain\":\"" + DOMAIN_X + "\"}")
                     .exchange().expectStatus().isOk()
-                    .expectBody().jsonPath("$.accessType").isEqualTo("broadcast");
+                    .expectBody().jsonPath("$.accessType").isEqualTo("broadcast")
+                    .jsonPath("$.state").isEqualTo("active")
+                    .jsonPath("$.domain").isEqualTo(DOMAIN_X);
+        }
+
+        /** The HTTP-layer twin of the fail-closed rule in {@code OwncastBroadcastService}
+         *  (asserted at the service layer by {@code OwncastBroadcastSuperadminCrossBrandBanTest}):
+         *  in multi-brand mode a SUPERADMIN grant with NO {@code targetDomain}, or one naming a
+         *  brand the registry does not know, is a 400 — never a {@code default}-stamped row that
+         *  no brand's broadcast guard would ever match. Checks the store too: nothing landed. */
+        @Test
+        void superadmin_grantWithoutKnownTargetDomain_400_failClosed(
+                @org.springframework.beans.factory.annotation.Autowired OwncastGrantRepository grants) {
+            postX("xsuper", List.of("superadmin"), "/bff/owncast/admin/access/grant")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue("{\"userSubject\":\"grantee-nodomain\"}")
+                    .exchange().expectStatus().isBadRequest()
+                    .expectBody().jsonPath("$.error")
+                    .isEqualTo("a SUPERADMIN grant must target a known brand via targetDomain");
+            postX("xsuper", List.of("superadmin"), "/bff/owncast/admin/access/grant")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue("{\"userSubject\":\"grantee-nodomain\",\"targetDomain\":\"brandz\"}")
+                    .exchange().expectStatus().isBadRequest()
+                    .expectBody().jsonPath("$.error")
+                    .isEqualTo("a SUPERADMIN grant must target a known brand via targetDomain");
+            // A null domain is the unscoped lookup (any brand), so this proves no row landed
+            // anywhere, 'default' included.
+            org.junit.jupiter.api.Assertions.assertNull(
+                    grants.findActive("grantee-nodomain", OwncastGrant.TYPE_BROADCAST, null).block(),
+                    "a rejected SUPERADMIN grant must not have stored a row in any brand");
         }
 
         @Test
