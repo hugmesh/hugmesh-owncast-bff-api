@@ -40,8 +40,8 @@ class OwncastStreamRepositoryTest extends PostgresTestSupport {
     @Autowired OwncastStreamRepository repo;
 
     private static final AtomicInteger SEQ = new AtomicInteger();
-    // Class-unique prefix: @DataR2dbcTest caches+shares ONE context (one H2 mem store) across
-    // test classes with identical @Import config, so prefix this class's subjects.
+    // Class-unique prefix: @DataR2dbcTest caches+shares ONE context across test classes with
+    // identical @Import config, so prefix this class's subjects to avoid cross-test collisions.
     private String user(String tag) { return "strepo-" + tag + "-" + SEQ.incrementAndGet(); }
 
     // ── USER-SITUATIONAL ──────────────────────────────────────────────────────

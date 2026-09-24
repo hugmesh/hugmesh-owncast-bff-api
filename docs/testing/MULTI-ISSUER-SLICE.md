@@ -85,4 +85,4 @@ The per-issuer resolver's allowlist is exactly `DomainRegistry.trustedIssuers()`
 is emitted** — there is no fallback "default" manager that could accept an unlisted
 brand. Scenario (b) is the regression guard that keeps it that way: a future refactor
 that introduces a default-accept (or routes an unknown `iss` to brand-X's manager)
-turns (b) red.
+makes (b) fail.

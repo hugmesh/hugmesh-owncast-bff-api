@@ -39,7 +39,7 @@ import java.util.List;
  * </ul>
  *
  * <p>The path policy is auth-decoder-agnostic, so this slice drives tokens through the
- * multi-issuer resolver path (the only no-network decoder seam — backed by an
+ * multi-issuer resolver path (the only way to decode without network, backed by an
  * in-process {@link TestIssuer}); the {@code authorizeExchange} rules under test are
  * identical on the single-issuer path.
  */

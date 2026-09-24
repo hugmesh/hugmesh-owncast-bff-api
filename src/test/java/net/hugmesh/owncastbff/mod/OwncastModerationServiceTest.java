@@ -218,7 +218,7 @@ class OwncastModerationServiceTest extends PostgresTestSupport {
         }
 
         /** The EXISTING OwncastBroadcastGuard (ban>grant) blocks a previously-GRANTED owner's
-         *  public flip AFTER a mod ban — the load-bearing precedence assertion. */
+         *  public flip AFTER a mod ban — the key precedence assertion. */
         @Test
         void afterModBan_existingGuardDeniesPreviouslyGrantedOwnersPublicFlip() {
             String owner = user("kill-grant");
@@ -361,19 +361,20 @@ class OwncastModerationServiceTest extends PostgresTestSupport {
             assertThat(activeBan(owner, "brandy")).isTrue();   // still banned in Y
         }
 
-        /** A SUPERADMIN moderating is domain-pinned to 'default' (NO all-brands bypass): they do
+        /** A SUPERADMIN moderating is domain fixed to 'default' (NO all-brands bypass): they do
          *  NOT see/affect a brand-X or brand-Y stream through the moderation surface. */
         @Test
         void superadmin_isDomainPinned_noAllBrandsBypass() {
             String owner = user("xdom-su");
             seedPublicStream(ISS_X, owner);   // a brand-X stream
 
-            // A SUPERADMIN's moderation domain pins to 'default' — the brand-X stream is invisible.
+            // A SUPERADMIN's moderation domain is fixed to 'default' — the brand-X stream is
+            // invisible.
             Authentication su = principal(ISS_X, "su-1", "superadmin");
             assertThat(service.listStreams(su).collectList().block())
                     .extracting(OwncastModerationDto.StreamRow::ownerSubject)
                     .doesNotContain(owner);
-            // A hide of the brand-X owner from the SUPERADMIN (pinned to 'default') is a 404.
+            // A hide of the brand-X owner from the SUPERADMIN (fixed to 'default') is a 404.
             StepVerifier.create(service.hide(su, owner, null))
                     .expectErrorSatisfies(e -> assertThat(((ApiException) e).status().value()).isEqualTo(404))
                     .verify();

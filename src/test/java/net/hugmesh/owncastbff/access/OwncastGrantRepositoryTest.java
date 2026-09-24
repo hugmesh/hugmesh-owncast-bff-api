@@ -52,10 +52,9 @@ class OwncastGrantRepositoryTest extends PostgresTestSupport {
     @Autowired OwncastGrantRepository repo;
 
     private static final AtomicInteger SEQ = new AtomicInteger();
-    // Class-unique prefix: @DataR2dbcTest caches+shares ONE context (one H2 mem store)
-    // across test classes with identical @Import config, so a bare per-class SEQ would
-    // collide subjects with the service/guard slice tests. The "repo" tag keeps this
-    // class's rows distinct in the shared store.
+    // Class-unique prefix: @DataR2dbcTest caches and shares ONE context across test classes
+    // with identical @Import config, so a bare per-class SEQ would collide subjects with the
+    // service/guard slice tests. The "repo" tag keeps this class's rows distinct.
     private String user(String tag) { return "repo-" + tag + "-" + SEQ.incrementAndGet(); }
 
     // ── USER-SITUATIONAL ──────────────────────────────────────────────────────

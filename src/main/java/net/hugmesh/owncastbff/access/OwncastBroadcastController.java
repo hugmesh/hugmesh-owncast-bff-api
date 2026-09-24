@@ -24,7 +24,7 @@ import java.util.Map;
 /**
  * The broadcast grant / timeout / ban OVERLAY surface — the write side of the
  * {@code owncast_grant} desired-state that {@link OwncastBroadcastGuard} enforces
- * (DEFAULT-DENY) on the broadcast path. CLONED in role model from the wiki-bff
+ * (DEFAULT-DENY) on the broadcast path. Role model copied from the wiki-bff
  * {@code WikiAccessController}.
  *
  * <p><b>ROLE MODEL.</b> {@code ROLE_OWNCAST} is the base service role (sibling of

@@ -1,7 +1,7 @@
 name: Release
 
 # Manual-only. Deliberately NOT wired to push/tag triggers -- this workflow
-# must stay fully inert until a human turns it on. Mirrors the container
+# does not run until manually triggered. Mirrors the container
 # build this repo's .gitlab-ci.yml already runs (test:unit -> build:image),
 # but publishes to GHCR instead of the org's in-cluster GitLab registry.
 on:
@@ -27,7 +27,7 @@ jobs:
       # PRIVATE net.hugmesh:hugmesh-parent / net.hugmesh:hugmesh-commons artifacts
       # resolve (they are not on Maven Central). Auth is a GitLab CI_JOB_TOKEN -- this has
       # nothing to authenticate with until that secret is populated, which is expected
-      # for an inert workflow_dispatch-only release job.
+      # for a manual-only release job.
       - name: Run tests
         env:
           CI_API_V4_URL: ${{ secrets.CI_API_V4_URL }}

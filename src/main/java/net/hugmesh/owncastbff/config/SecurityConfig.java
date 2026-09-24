@@ -47,7 +47,7 @@ import net.hugmesh.owncastbff.security.PrincipalDomain;
  *       MANAGE-ALL surface (OWNCAST_MANAGE: list-all + history). Declared FIRST so the
  *       most-specific prefix wins.</li>
  *   <li>{@code /bff/owncast/admin/**} -> {@code hasAnyRole('ADMIN','SUPERADMIN')} — the
- *       OWNCAST_GOVERN grant/timeout/ban/restore seam. Admins reach it via the
+ *       OWNCAST_GOVERN grant/timeout/ban/restore surface. Admins reach it via the
  *       converter's ROLE_ADMIN; SUPERADMIN reaches it via the role hierarchy edge.</li>
  *   <li>{@code /bff/owncast/mod/**} -> {@code hasAnyRole('MOD','ADMIN','SUPERADMIN')} — the
  *       MODERATION surface (list a brand's streams; hide/kill/restore a target owner;
@@ -100,9 +100,10 @@ public class SecurityConfig {
     private final ObjectProvider<ReactiveAuthenticationManagerResolver<ServerWebExchange>>
             tenantAuthManagerResolver;
 
-    /** D8 MFA floor (fan-out from the MERGED gateway) — {@code app.mfa.enabled}
-     *  (default {@code false}: ships dark). When false the converter emits the
-     *  legacy authority set verbatim and {@code MFA_SATISFIED} is never produced. */
+    /** D8 MFA floor (from the merged gateway) — {@code app.mfa.enabled}
+     *  (default {@code false}: present in the code but switched off by default). When false
+     *  the converter emits the legacy authority set verbatim and {@code MFA_SATISFIED} is never
+     *  produced. */
     private final boolean mfaEnabled;
 
     /** D8 MFA freshness window {@code app.mfa.freshness-window} in millis (default
@@ -144,7 +145,7 @@ public class SecurityConfig {
         // The MANAGE-ALL surface — SUPERADMIN only (OWNCAST_MANAGE: list-all + history).
         // Declared BEFORE the admin + floor prefixes so the most-specific path matches first.
         ex.pathMatchers("/bff/owncast/superadmin/**").hasRole("SUPERADMIN");
-        // The OWNCAST_GOVERN grant/timeout/ban/restore seam — ADMIN (or the cross-domain
+        // The OWNCAST_GOVERN grant/timeout/ban/restore surface — ADMIN (or the cross-domain
         // SUPERADMIN super-role) end-to-end. Admins reach it via the converter's ROLE_ADMIN;
         // SUPERADMIN reaches it via the role hierarchy edge.
         ex.pathMatchers("/bff/owncast/admin/**").hasAnyRole("ADMIN", "SUPERADMIN");
@@ -181,7 +182,7 @@ public class SecurityConfig {
     /**
      * Hardened HTTP response headers — the API-DEFENSIVE MINIMUM for a pure-JSON
      * resource-server BFF (OWASP secure-headers / NIST 800-228). This BFF NEVER serves
-     * HTML or a document and ALWAYS sits behind the hugmesh-gateway front door, which
+     * HTML or a document and ALWAYS sits behind the hugmesh-gateway public entry point, which
      * emits the full browser-policy set (HSTS / Permissions-Policy / the UI-shell CSP)
      * exactly once at the single TLS-terminating PEP so all brands/BFFs inherit it and
      * the 12 per-BFF configs can't drift. So this chain re-asserts ONLY defense-in-depth:
@@ -194,7 +195,7 @@ public class SecurityConfig {
      *       {@code X-Content-Type-Options: nosniff}, {@code X-Frame-Options: DENY} and the
      *       {@code Cache-Control} no-store family.</li>
      * </ul>
-     * Deliberately OMITTED here (they belong only at the TLS front door, never on a
+     * Deliberately OMITTED here (they belong only at the gateway's TLS entry point, never on a
      * plaintext intra-mesh JSON hop): {@code Strict-Transport-Security} (meaningless over
      * HTTP) and {@code Permissions-Policy} / the UI-shell CSP (no document to govern).
      * This is purely ADDITIVE — no authz rule, issuer validation or CSRF posture changes.

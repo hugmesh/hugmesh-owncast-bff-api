@@ -11,11 +11,10 @@ import org.springframework.stereotype.Component;
  * (subject + brand) into the URL their viewer/player uses, WITHOUT this BFF holding a stream
  * key or talking to the media plane.
  *
- * <p><b>DARK BY DEFAULT (the additive-safety flag).</b> The template
- * ({@code owncast.playback.url-template}) is UNSET by default, so {@link #resolve} returns
- * {@code null} and the {@code playbackUrl} field is simply absent from responses until an
- * operator opts in by configuring the template. Nothing about existing behaviour changes when
- * the template is unset. The template substitutes two placeholders:
+ * <p>The template ({@code owncast.playback.url-template}) is unset by default, so
+ * {@link #resolve} returns {@code null} and the {@code playbackUrl} field is simply absent
+ * from responses. An operator opts in by configuring the template; nothing about existing
+ * behaviour changes when the template is unset. The template substitutes two placeholders:
  * <ul>
  *   <li>{@code {domain}} — the brand/tenant the stream belongs to (server-derived, never a
  *       request field);</li>
@@ -40,8 +39,8 @@ public class OwncastPlaybackUrlResolver {
 
     /**
      * The HLS playback URL for the stream owned by {@code subject} in {@code domain}, or
-     * {@code null} when no template is configured (dark by default) or when either input is
-     * blank. Pure string formatting — never throws, never contacts the media plane.
+     * {@code null} when no template is configured or when either input is blank. Pure string
+     * formatting — never throws, never contacts the media plane.
      */
     public String resolve(String domain, String subject) {
         if (template.isEmpty() || domain == null || domain.isBlank()

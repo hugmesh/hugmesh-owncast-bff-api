@@ -189,7 +189,8 @@ public class OwncastBroadcastService {
      */
     private Mono<String> writeDomain(Authentication actor, String targetDomain, String verb) {
         String scope = scopeOf(actor);
-        // Scoped ADMIN: own brand only; the request's targetDomain is inert (no cross-brand write).
+        // Scoped ADMIN: own brand only; the request's targetDomain has no effect (cannot write
+        // across brands).
         if (scope != null) {
             return Mono.just(scope);
         }

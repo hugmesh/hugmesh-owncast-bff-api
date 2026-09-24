@@ -66,7 +66,7 @@ class OwncastStreamServiceTest extends PostgresTestSupport {
             "https://id.brandx.example=brandx,https://id.brandy.example=brandy");
     private static final PrincipalDomain PD = new PrincipalDomain(MULTI);
 
-    /** A CONFIGURED playback-URL template (the dark-by-default flag turned ON) so we can assert
+    /** A CONFIGURED playback-URL template (unset by default; here it is set) so we can assert
      *  the URL is RESOLVED for a permitted viewer and WITHHELD (null) from a denied one. */
     private static final OwncastPlaybackUrlResolver PLAYBACK =
             new OwncastPlaybackUrlResolver("https://{domain}.example/owncast/{subject}/hls/stream.m3u8");
@@ -239,7 +239,7 @@ class OwncastStreamServiceTest extends PostgresTestSupport {
     class PublicVisibilityGate {
 
         /** A user WITHOUT an active broadcast grant CANNOT set visibility=public (403) — the
-         *  load-bearing rule of this PR. */
+         *  rule the rest of this PR depends on. */
         @Test
         void withoutGrant_cannotGoPublic_butCanStayInternal() {
             String u = user("gate-nogrant");
@@ -370,7 +370,7 @@ class OwncastStreamServiceTest extends PostgresTestSupport {
                     .isEqualTo("https://" + created.domain() + ".example/owncast/" + u + "/hls/stream.m3u8");
         }
 
-        /** With NO template configured (dark by default) the URL is null EVEN for a permitted
+        /** With NO template configured (the default) the URL is null EVEN for a permitted
          *  viewer — additive + opt-in. */
         @Test
         void darkByDefault_noTemplate_playbackUrlIsNull_evenWhenPermitted() {

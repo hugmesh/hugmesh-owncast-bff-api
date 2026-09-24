@@ -22,11 +22,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * REUSABLE multi-issuer test fixture — the cornerstone of the copyable multi-issuer
- * security-slice pattern (see {@code docs/testing/MULTI-ISSUER-SLICE.md}). COPIED
- * VERBATIM from the adversarially-verified-safe hugmesh-gateway
- * {@code net.hugmesh.gateway.testsupport.TestIssuer} (package adjusted), so the
- * owncast BFF proves the SAME fail-closed multi-issuer property the gateway proves.
+ * Reusable multi-issuer test fixture (see {@code docs/testing/MULTI-ISSUER-SLICE.md}). Copied
+ * verbatim from hugmesh-gateway {@code net.hugmesh.gateway.testsupport.TestIssuer} (package
+ * adjusted), so the owncast BFF proves the SAME fail-closed multi-issuer property the gateway
+ * proves: a token from an issuer not in the registry is rejected (401), never accepted.
  *
  * <p>Each {@code TestIssuer} stands up a tiny in-process HTTP server (JDK
  * {@link HttpServer}, bound to {@code 127.0.0.1}) that serves exactly what Spring
