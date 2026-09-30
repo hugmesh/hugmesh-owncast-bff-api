@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -33,7 +35,19 @@ public final class OwncastAccessDto {
 
     /** The list-response wrapper. */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AccessList(List<Access> access) {}
+    public record AccessList(List<Access> access) {
+
+        /** Defensive, unmodifiable copy on the way in; null stays null (never turned into an NPE). */
+        public AccessList {
+            access = access == null ? null : Collections.unmodifiableList(new ArrayList<>(access));
+        }
+
+        /** Unmodifiable view; the record never hands out its backing list. */
+        @Override
+        public List<Access> access() {
+            return access == null ? null : Collections.unmodifiableList(access);
+        }
+    }
 
     // ── request bodies ─────────────────────────────────────────────────
 

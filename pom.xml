@@ -55,6 +55,19 @@
       <scope>test</scope>
     </dependency>
 
+    <!-- Compile-time only (CLASS retention, absent from the runtime/native image): the
+         @SuppressFBWarnings annotation for the one justified EI_EXPOSE_REP2 constructor
+         injection site (OwncastBroadcastGuard). Pinned to the spotbugs-maven-plugin's own
+         SpotBugs version (hugmesh-parent: spotbugs-maven-plugin 4.9.8.2 -> SpotBugs 4.9.8).
+         A repo-local excludeFilterFiles entry does NOT work: the plugin passes each filter
+         as a separate -exclude and SpotBugs honours only one. -->
+    <dependency>
+      <groupId>com.github.spotbugs</groupId>
+      <artifactId>spotbugs-annotations</artifactId>
+      <version>4.9.8</version>
+      <scope>provided</scope>
+    </dependency>
+
     <!-- ============================================================================
          The core reactive BFF stack (webflux / actuator / security /
          oauth2-resource-server / validation), the data-access stack (data-r2dbc /

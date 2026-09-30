@@ -3,6 +3,8 @@ package net.hugmesh.owncastbff.mod;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.Size;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -28,7 +30,19 @@ public final class OwncastModerationDto {
 
     /** The stream-list response wrapper. */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record StreamList(List<StreamRow> streams) {}
+    public record StreamList(List<StreamRow> streams) {
+
+        /** Defensive, unmodifiable copy on the way in; null stays null (never turned into an NPE). */
+        public StreamList {
+            streams = streams == null ? null : Collections.unmodifiableList(new ArrayList<>(streams));
+        }
+
+        /** Unmodifiable view; the record never hands out its backing list. */
+        @Override
+        public List<StreamRow> streams() {
+            return streams == null ? null : Collections.unmodifiableList(streams);
+        }
+    }
 
     /** {@code POST .../streams/{ownerSubject}/(hide|ban|restore)} — an optional moderator
      *  reason (audited). The body carries NO subject/domain — the target is the path variable,
