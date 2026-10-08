@@ -38,8 +38,8 @@ Its companion frontend is [`hugmesh-owncast-ui`](https://github.com/hugmesh/hugm
 ## Status
 
 This reflects the current state of `main` — the source layout, the Liquibase
-changelogs, and the `@SpringBootTest` / `@DataR2dbcTest` / security-slice suites
-under `src/test`:
+changelogs, and the `@SpringBootTest` / `@DataR2dbcTest` / `@WebFluxTest` /
+security-slice suites under `src/test`:
 
 - ✅ **Shipped and tested**: the `owncast_grant` broadcast grant/timeout/ban overlay
   with `OwncastBroadcastGuard` default-deny enforcement; `owncast_stream`
@@ -49,9 +49,9 @@ under `src/test`:
   (list/hide/kill/restore) with its own append-only `owncast_moderation_audit`
   journal; database-generated UUID primary keys on all three tables; hardened
   OWASP/NIST response headers; an opt-in multi-issuer (per-brand Casdoor) resource
-  server with fail-closed unknown-issuer handling; Spring Boot 4.0.2 on Java 25
-  (see `pom.xml`'s inherited parent and the `eclipse-temurin:25-*` Dockerfile
-  stages); a centralized OWASP pen-test CI stage (SCA + DAST, non-blocking).
+  server with fail-closed unknown-issuer handling; Spring Boot 4.0.7 on Java 25
+  (inherited from `hugmesh-parent` 2.8.0, the parent named in `pom.xml`; the
+  Dockerfile stages are `eclipse-temurin:25-*`); a centralized OWASP pen-test CI stage (SCA + DAST, non-blocking).
   Cross-repo: `hugmesh-mod-bff-api`'s central `mod_action` ledger wiring for
   `owncast.hide` / `owncast.kill` / `owncast.restore` is also shipped (its
   changelog `010`) — no code change was needed in this repo for that leg.
@@ -59,18 +59,26 @@ under `src/test`:
   and streamer-ConfigMap reconciler that would turn a broadcast grant into an
   actual per-streamer Owncast Deployment; the `sd-owncast-player` federated video
   card kind; a dedicated streamer/instance-lifecycle management UI; the
-  generator/devops per-domain service-enable and GPU node-affinity gate. See the
-  [Roadmap](#roadmap) for details — the Liquibase changelog comments flag each of
-  these as deferred.
+  generator/devops per-domain service-enable. See the [Roadmap](#roadmap) for
+  details. The comment in Liquibase changelog `005` flags the reconciler, the
+  ApplicationSet feed and the stream-key mint as deferred; nothing in this repo
+  flags the other gaps. GPU node pinning and the default-off switch already ship
+  in the generator (see [Role model](#role-model)).
 
 ## What this service owns
 
 This service is the **may-broadcast governance plane**, not the media plane. The
-Owncast media instances are separate per-streamer Kubernetes Deployments — each
-with its own `/app/data` volume and stream key — with RTMP ingest on `:1935`
+Owncast media server is separate from this BFF, with RTMP ingest on `:1935`
 (tailnet-only, never public) and HLS playback on `:8080` (behind the gateway).
-Because Owncast is single-broadcaster per instance, the platform runs one
-Owncast Deployment per approved streamer, provisioned on grant, default-deny.
+
+Today the generator deploys one shared Deployment, `hugmesh-owncast`
+(`replicas: 1`, `specs/cluster/manifests/owncast/deployment.yaml`): the Owncast
+server, this BFF and `hugmesh-owncast-ui` run as three containers in one pod, on
+an `emptyDir` data volume. The design target is different. Owncast is
+single-broadcaster per instance, so the platform is meant to run one Owncast
+Deployment per approved streamer, each with its own `/app/data` volume and stream
+key, provisioned on grant. That provisioning is not built (see the
+[Roadmap](#roadmap)).
 
 The browser-to-governance path, alongside the separate media plane:
 
@@ -83,7 +91,7 @@ flowchart TD
     subgraph bff["THIS BFF — may-broadcast GOVERNANCE plane (shipped)"]
         admin["/bff/owncast/admin/access<br/>ADMIN | SUPERADMIN — grant/timeout/ban/restore"]
         super["/bff/owncast/superadmin/access<br/>SUPERADMIN — list-all + history"]
-        mod["/bff/owncast/mod<br/>MOD | ADMIN | SUPERADMIN — list/hide/kill/restore"]
+        mod["/bff/owncast/mod<br/>MOD | ADMIN | SUPERADMIN — list/hide/ban(kill)/restore"]
         userstream["/bff/owncast/user/stream<br/>ROLE_OWNCAST — get/upsert + visibility flip"]
         guard{{"OwncastBroadcastGuard<br/>default-deny, ban &gt; grant, SUPERADMIN exempt"}}
         grant[("owncast_grant (004)<br/>broadcast/banned overlay")]
@@ -91,7 +99,7 @@ flowchart TD
         audit[("owncast_moderation_audit (006)<br/>append-only mod journal")]
     end
 
-    subgraph media["Media plane — per-streamer Owncast Deployments (NOT this BFF)"]
+    subgraph media["Media plane — Owncast (NOT this BFF); one shared Deployment today, per-streamer planned"]
         rtmp["Owncast :1935 RTMP ingest (tailnet-only)"]
         hls["Owncast :8080 HLS playback (behind gateway)"]
     end
@@ -114,7 +122,7 @@ flowchart TD
     mod --> stream
     mod --> audit
     userstream --> stream
-    userstream -. "PUBLIC flip only" .-> guard
+    userstream -. "PUBLIC flip + playbackUrl" .-> guard
     guard --> grant
 
     obs -. tailnet .-> rtmp
@@ -128,9 +136,9 @@ flowchart TD
     class effector,card planned
 ```
 
-RTMP ingest and HLS playback never touch this BFF — they run on the per-streamer
-Owncast Deployments, reached over the tailnet / the gateway. The dashed nodes
-above are [roadmap](#roadmap) items, not yet on `main`.
+RTMP ingest and HLS playback never touch this BFF — they run on the Owncast
+server, reached over the tailnet / the gateway. The dashed nodes above are
+[roadmap](#roadmap) items, not yet on `main`.
 
 ## The `owncast_grant` overlay and `OwncastBroadcastGuard`
 
@@ -140,8 +148,10 @@ The broadcast grant/timeout/ban overlay is cloned from the wiki-bff `wiki_access
 - **`owncast_grant`** (Liquibase `004-owncast-grant.xml`) — the desired-state table:
   `access_type ∈ {broadcast, banned}`, `state ∈ {active, revoked}` (never deleted,
   so history is preserved for audit), `expires_at` (NULL = permanent, a future
-  timestamp = a timeout that auto-restores), a partial-unique constraint on active
-  `(domain, user_subject, access_type)`, and domain scoping throughout.
+  timestamp = a timeout that auto-restores; a timeout is a `banned` row with a
+  future `expires_at`), a partial unique index on active
+  `(domain, user_subject, access_type)` (PostgreSQL only), and domain scoping
+  throughout.
 - **`OwncastBroadcastGuard.assertCanBroadcast`** — the default-deny
   enforcement point every broadcast path depends on. Decision order:
   1. SUPERADMIN → immediately **allow** (exempt from ban).
@@ -151,11 +161,15 @@ The broadcast grant/timeout/ban overlay is cloned from the wiki-bff `wiki_access
   4. An active `broadcast` grant → **allow**.
   5. No qualifying grant → **403**.
 
-  Unlike wiki read access (which allows any user holding `ROLE_WIKI`), broadcasting
-  is grant-only by design — there is no role-level bypass.
+  Wiki read access has a static role floor (`ADMIN` | `SUPERADMIN` | `MOD` with
+  `WIKI`). Broadcasting has none: it is grant-only by design, with no role-level
+  bypass.
 - **`OwncastBroadcastController`** — exposes
-  `/bff/owncast/admin/access` for grant/timeout/ban/restore (`ADMIN` | `SUPERADMIN`)
-  and `/bff/owncast/superadmin/access` for list/history (`SUPERADMIN`).
+  `/bff/owncast/admin/access` for grant/timeout/ban/restore (`ADMIN` | `SUPERADMIN`):
+  `POST /grant`, `POST /timeout`, `POST /ban`, and
+  `DELETE /{accessType}/{userSubject}` (`accessType` is `broadcast` or `banned`;
+  the row is revoked, not deleted). It exposes `/bff/owncast/superadmin/access`
+  for list (`GET`) and history (`GET /{userSubject}/history`) (`SUPERADMIN`).
 - **`ROLE_OWNCAST`** — the base service role, a sibling of `ROLE_WIKI` / `ROLE_FORUM`.
 
 ## `owncast_stream` self-visibility (`/bff/owncast/user/stream`)
@@ -246,9 +260,10 @@ server-side from the JWT; every action is scoped to
     owner's active broadcast-ban flag).
   - `POST /streams/{ownerSubject}/hide` — force the target's stream
     `visibility=internal`.
-  - `POST /streams/{ownerSubject}/ban` — write an active `owncast_grant(banned)`
-    row (so the existing `OwncastBroadcastGuard` ban-over-grant precedence blocks
-    the owner's public broadcast flip) and force the stream internal. This is
+  - `POST /streams/{ownerSubject}/ban` — the "kill" verb: write an active
+    `owncast_grant(banned)` row (so the existing `OwncastBroadcastGuard`
+    ban-over-grant precedence blocks the owner's public broadcast flip) and force
+    the stream internal. The audit journal records this action as `kill`. This is
     audit-preserving — it never hard-deletes anything.
   - `POST /streams/{ownerSubject}/restore` — atomically transitions (compare-and-
     swap) the active broadcast ban row from `active` to `revoked` (the row is
@@ -258,7 +273,8 @@ server-side from the JWT; every action is scoped to
   is a local traceability layer on top of both. The moderation verbs are
   kill/hide/ban/restore only — a MOD never reaches the admin/superadmin
   governance prefixes (separate controllers under higher path gates) and never
-  grants broadcast access.
+  grants broadcast access. Moderation is pinned to one brand with no all-brands
+  bypass: a SUPERADMIN moderates inside the `default` brand only.
 - **Database-generated UUID primary keys** (Liquibase
   `007-db-generated-uuid-pks.xml`) — all three tables (`owncast_grant` /
   `owncast_stream` / `owncast_moderation_audit`) now have Postgres mint their
@@ -278,7 +294,7 @@ The four prefixes, gated in `SecurityConfig`:
 | --- | --- | --- |
 | `/bff/owncast/superadmin/**` | `SUPERADMIN` | list-all + history (`OWNCAST_MANAGE`) |
 | `/bff/owncast/admin/**` | `ADMIN` \| `SUPERADMIN` | grant/timeout/ban/restore (`OWNCAST_GOVERN`) |
-| `/bff/owncast/mod/**` | `MOD` \| `ADMIN` \| `SUPERADMIN` | list/hide/kill/restore |
+| `/bff/owncast/mod/**` | `MOD` \| `ADMIN` \| `SUPERADMIN` | list/hide/ban (kill)/restore |
 | `/bff/owncast/user/**` | `OWNCAST` | own stream + self-visibility |
 | `/bff/owncast/**` | `.authenticated()` | catch-all floor; the gateway also enforces the `ROLE_OWNCAST` route-access check upstream |
 
@@ -293,7 +309,10 @@ because a static SpEL expression can't query the database.
   and one issuer-derived `DOMAIN_<x>` authority per token).
 - An opt-in multi-issuer resource server: one Casdoor instance per brand; an
   unknown `iss` claim yields 401.
-- A SUPERADMIN-only role hierarchy.
+- A SUPERADMIN-only role hierarchy (`SUPERADMIN` > `ADMIN`, `MOD`, `USER`).
+- An optional MFA floor: `app.mfa.enabled` (default `false`) and
+  `app.mfa.freshness-window` (default 600000 ms), passed to the shared Casdoor
+  converter.
 - OpenAPI spec / Swagger UI exposed publicly under the `dev`/`test` profiles (so
   `ng-openapi-gen` can fetch the spec without credentials) and gated to
   `ADMIN`/`SUPERADMIN` in production.
@@ -308,17 +327,17 @@ hop.
 
 ## Role model
 
-- **SUPERADMIN** — `OWNCAST_MANAGE`; enables the service per domain (the
-  GPU-node-affinity check is a generator/devops concern — see the
-  [Roadmap](#roadmap)); has cross-domain visibility; exempt from the broadcast
-  ban.
+- **SUPERADMIN** — `OWNCAST_MANAGE`; has cross-domain visibility on the grant
+  surfaces (not on the moderation surface); exempt from the broadcast ban. Per-domain
+  service-enable by SUPERADMIN is planned, not built — see the
+  [Roadmap](#roadmap).
 - **ADMIN (own brand)** — `OWNCAST_GOVERN`: grant/timeout/ban/restore
   may-broadcast access (`/bff/owncast/admin/access`).
-- **MOD** — moderation lives here at `/bff/owncast/mod` (list/hide/kill/restore;
+- **MOD** — moderation lives here at `/bff/owncast/mod` (list/hide/ban/restore;
   ban/restore reuse `owncast_grant`). The cross-repo `hugmesh-mod-bff-api`
   `ModActionType owncast.*` wiring into the central mod-action ledger is
   shipped: its `/bff/mod/owncast/streams/{owner}/hide|kill|restore` drives
-  these effector endpoints (the caller's bearer is forwarded — this service
+  these effector endpoints (`kill` calls this service's `/ban`) (the caller's bearer is forwarded — this service
   re-derives the moderator's identity and brand from the same validated token)
   and records the matching `owncast.hide`/`owncast.kill`/`owncast.restore` row
   in the central `mod_action` ledger (mod-bff changelog `010`). An action driven
@@ -330,22 +349,35 @@ hop.
   while the user holds an active broadcast grant (default-deny; SUPERADMIN
   exempt).
 
-The service is **off by default** and is GPU-pinned (x86 + GPU dependent) —
-see the [Roadmap](#roadmap) for the per-domain enable path.
+The service is **off by default** and is GPU-pinned (x86 + GPU dependent). The
+generator ships both: the app is marked default-off
+(`specs/cluster/apps/52-owncast.yaml`) and the pod carries the node selector
+`kubernetes.io/arch: amd64` plus `hugmesh.net/compute: gpu`
+(`specs/cluster/manifests/owncast/deployment.yaml`). The per-domain enable path
+is on the [Roadmap](#roadmap).
 
 ## Build, test and CI
 
 Build and test: `./mvnw -DskipITs test`. CI runs on GitLab (`.gitlab-ci.yml`):
-`test` → `build` → `pentest` stages.
+`test` → `build` → `pentest` stages. A manual-only GitHub workflow,
+`.github/workflows/release.yml` (`workflow_dispatch`), builds the image and pushes
+it to GHCR.
 
 The full-context `@SpringBootTest` integration tests extend the shared
 `net.hugmesh.commons.testsupport.PostgresTestSupport` (from the
 `hugmesh-commons` test-jar), which boots a real per-class **Testcontainers**
 Postgres — so a Docker daemon is required for `./mvnw test` (the `test:unit` CI
 job runs a `docker:dind` service). The `@DataR2dbcTest` repository/service
-slices run against the inherited in-memory H2-PG-compat store. `OpenApiSpecDumpTest`
-re-dumps the committed `src/main/resources/openapi/openapi.json` deterministically
-(the server URL is normalized so the random test port never moves the file).
+slices extend the same base and run the production Liquibase changelog on that
+Postgres, through `PostgresSliceTestConfig`. They need it: changelog `007` uses
+`gen_random_uuid()` and `INSERT ... RETURNING`, which an H2 store cannot run.
+`OpenApiSpecDumpTest` asserts that the committed
+`src/main/resources/openapi/openapi.json` matches the live API; it fails on drift
+(the server URL is normalized so the random test port never moves the file). To
+refresh the file, run
+`./mvnw -Dtest=OpenApiSpecDumpTest -Dopenapi.spec.write=true test` and commit the
+result. The CI job also runs `git diff --exit-code` after the tests, so a test that
+rewrites a committed file fails the build.
 
 The multi-issuer (per-brand Casdoor) security-slice tests
 (`SecurityConfigPathGateSliceTest`, `MultiIssuerSecuritySliceTest`) follow a
@@ -371,9 +403,8 @@ media-plane and cross-repo pieces are not yet on `main` in this repo:
 
 - 🔭 **Per-streamer provisioning effector and streamer-ConfigMap reconciler** —
   turning an `owncast_grant` broadcast grant into an actual per-streamer Owncast
-  Deployment: the ApplicationSet feed and stream-key `Secret` mint. The
-  Liquibase changelogs `005-owncast-stream.xml` and
-  `006-owncast-moderation-audit.xml` carry comments flagging this as a deferred
+  Deployment: the ApplicationSet feed and stream-key `Secret` mint. The comment in
+  Liquibase changelog `005-owncast-stream.xml` flags this as a deferred
   follow-up gated on the generator.
 - 🔭 **`sd-owncast-player` federated video card kind** — per-user federated video
   remotes, templated like profile cards, driven by this BFF's `owncast_stream`
@@ -381,12 +412,14 @@ media-plane and cross-repo pieces are not yet on `main` in this repo:
   reconciler.
 - 🔭 **Management UI** for streamer/instance lifecycle, beyond the existing
   governance/moderation views already in `hugmesh-owncast-ui`.
-- 🔭 **Generator/devops** — per-domain SUPERADMIN service-enable that enforces
-  the GPU node-affinity / x86-and-GPU-pinned constraint.
+- 🔭 **Generator/devops** — per-domain SUPERADMIN service-enable. The GPU
+  node-affinity / x86-and-GPU-pinned constraint and the default-off switch already
+  ship in the generator; only the per-domain enable is open.
 - ✅ **Cross-repo `hugmesh-mod-bff-api` `ModActionType owncast.*` wiring** —
   shipped in mod-bff (its changelog `010` and `/bff/mod/owncast/**` surface): a
   moderator driving hide/kill/restore through the central mod surface hits this
-  BFF's `/bff/owncast/mod` effector endpoints (the caller's bearer is forwarded)
+  BFF's `/bff/owncast/mod` effector endpoints (`kill` posts to `/ban`; the
+  caller's bearer is forwarded)
   and gets an `owncast.hide`/`owncast.kill`/`owncast.restore` row in the central
   `mod_action` ledger — no code change was needed in this repo, since the
   effector surface already existed. Scope note: an action taken directly at

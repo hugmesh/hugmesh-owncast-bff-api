@@ -23,8 +23,11 @@ RSA-signed tokens offline.
 | (b) | A token from an issuer **not** in `app.tenancy.issuers` (well-formed, correctly signed, just unlisted) | the per-issuer resolver returns `Mono.empty()` → **401 fail-closed**, never a default-accept | CROSS-USER DENY |
 | (c) | A brand-Y JWT presented to the resource server | scoped to brand-Y; can **never** become brand-X (no `DOMAIN_brandx`) | CROSS-USER DENY |
 
-Plus the cheap fail-closed neighbours: a **tampered signature** and a **garbage
-bearer** both 401.
+Plus the cheap fail-closed neighbours: a **tampered signature**, a **garbage
+bearer** and a **missing bearer** all 401. A brand-X token whose `permissions`
+claim carries `DOMAIN_brandy` or `ROLE_SUPERADMIN` gains neither authority;
+the converter strips reserved prefixes
+(`crossUser_permissionsCannotForgeForeignDomain`).
 
 ---
 
@@ -38,13 +41,21 @@ Each instance generates a fresh RSA keypair, starts a JDK `HttpServer` on
 A token minted by issuer A is cryptographically valid **only** against issuer A's
 manager — that is exactly the cross-brand isolation (c). Only dependency:
 `nimbus-jose-jwt`, already transitive via `spring-boot-starter-oauth2-resource-server`.
+`mintWithClaims(subject, claims)` mints a token with arbitrary claims (for example a
+forged `permissions` list).
 
 ### 2. `SecuritySliceSupport` — `src/test/java/.../config/SecuritySliceSupport.java`
 
 Constructs this repo's real `SecurityConfig` filter chain
-(`SecurityConfig(DomainRegistry, ObjectProvider<resolver>)`), wraps it in a
+(`new SecurityConfig(registry, tenantResolver, false, 600000L)`: the
+`DomainRegistry`, an `ObjectProvider` of the resolver, the `app.mfa.enabled` flag
+and the `app.mfa.freshness-window` in milliseconds), wraps it in a
 `WebFilterChainProxy`, and installs it as a `webFilter` on
 `WebTestClient.bindToController(...)` — no full Spring Boot context is needed.
+The slice also needs `src/test/java/net/hugmesh/commons/config/TenancyResolvers.java`.
+`TenancyResourceServerConfig` lives in `hugmesh-commons` and its resolver bean method
+is package-private; this one-method class, in the same package under this repo's test
+sources, lets the tests call it. Copy it with the other two files.
 Because the owncast `SecurityConfig` exposes two profile-split chains, this
 support exposes both `sliceClient(...)` (the prod `filterChain`,
 `@Profile("!dev & !test")`) and `devSliceClient(...)` (the dev/test
