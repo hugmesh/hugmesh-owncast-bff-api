@@ -30,6 +30,7 @@ Its companion frontend is [`hugmesh-owncast-ui`](https://github.com/hugmesh/hugm
 - [Endpoint surface](#endpoint-surface)
 - [Role model](#role-model)
 - [Build, test and CI](#build-test-and-ci)
+  - [Versions and publishing](#versions-and-publishing)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -52,8 +53,8 @@ under `src/test`.
   - hardened OWASP/NIST response headers;
   - an opt-in multi-issuer (per-brand Casdoor) resource server that fails closed
     on an unknown issuer;
-  - Spring Boot 4.0.7 on Java 25 (inherited from `hugmesh-parent` 2.8.0, the
-    parent named in `pom.xml`; the Dockerfile stages are `eclipse-temurin:25-*`);
+  - Spring Boot 4.0.7 on Java 25 (inherited from `hugmesh-parent` 2.9.0-beta.1,
+    the parent named in `pom.xml`; the Dockerfile stages are `eclipse-temurin:25-*`);
   - a centralized OWASP pen-test CI stage (SCA + DAST, non-blocking);
   - cross-repo: `hugmesh-mod-bff-api` writes `owncast.hide` / `owncast.kill` /
     `owncast.restore` rows to its central `mod_action` ledger (its changelog
@@ -361,9 +362,9 @@ is on the [Roadmap](#roadmap).
 ## Build, test and CI
 
 Build and test: `./mvnw -DskipITs test`. CI runs on GitLab (`.gitlab-ci.yml`):
-`test` → `build` → `pentest` stages. A manual-only GitHub workflow,
-`.github/workflows/release.yml` (`workflow_dispatch`), builds the image and pushes
-it to GHCR.
+`test` → `build` → `pentest` stages. The GitHub workflow
+`.github/workflows/release.yml` builds the image and pushes it to GHCR (see
+[Versions and publishing](#versions-and-publishing)).
 
 The full-context `@SpringBootTest` integration tests extend the shared
 `net.hugmesh.commons.testsupport.PostgresTestSupport` (from the
@@ -396,6 +397,44 @@ what the slice asserts and why fail-closed is the property that matters.
 - 🔭 Further harness additions (nuclei templates, k6 load testing) belong to the
   generator template and are tracked there. This repo uses the centralized
   include, so they arrive as the generator template adds them.
+
+### Versions and publishing
+
+The package is in beta: `pom.xml` is `0.2.0-beta.1` (base `0.2.0` means built and tested,
+not yet proven on a live mesh). Each new published beta of the same base raises the
+`-beta.N` number; a published version is never reused or overwritten. It builds against
+`hugmesh-parent 2.9.0-beta.1` and the `hugmesh-commons 2.2.0-beta.1` tests jar, which the
+library release chain (build-config, then parent, then commons) must publish first.
+
+`.github/workflows/release.yml` publishes `ghcr.io/hugmesh/hugmesh-owncast-bff-api`. Its
+first job tests and then runs `scripts/release-version.sh`, which reads the version from
+`pom.xml` and decides what may be pushed:
+
+| Trigger | Image tags | GitHub Release |
+|---|---|---|
+| push to `main`, or a manual run on `main` | `main`, `sha-<12>` | none |
+| push of tag `v<version>`, or a manual run on that tag | `<version>`, `beta` (for a `-beta.N`), `sha-<12>` | prerelease, not latest |
+| anything else | refused | none |
+
+The tag must equal `v` + the `pom.xml` version, a `-SNAPSHOT` is refused, and a version
+that already exists in GHCR is never overwritten. `latest` moves only for a final
+(non-prerelease) version, and none exists yet. There is no pull-request trigger. Nothing
+is pushed until the cross-repo package read and `./mvnw -DskipITs test` have passed in
+the same run. Each job runs on the runner list in the repository variable
+`RUNS_ON_PUBLISH` (for example the local self-hosted runner) only for `main` and `v*`
+tags; otherwise, or when that variable is unset, it runs on GitHub-hosted
+`ubuntu-latest`.
+
+The preflight job checks that the repository secret `PACKAGES_READ_TOKEN` (a classic PAT
+with `read:packages`) can read `hugmesh-build-config`, `hugmesh-parent` and
+`hugmesh-commons` on GitHub Packages; without it, that step fails by name. GitHub
+Packages needs a token even for a public package, so the secret stays after the
+repository goes public.
+
+To publish a beta: merge the version change, push an annotated tag `v<version>` on that
+`main` commit (the tag push runs the release), or re-run it with
+`gh workflow run release.yml -R hugmesh/hugmesh-owncast-bff-api --ref v<version>`. Test
+the guard with `bash scripts/test-release-version.sh`.
 
 ## Roadmap
 
