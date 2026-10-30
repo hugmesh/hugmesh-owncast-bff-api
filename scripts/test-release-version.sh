@@ -112,6 +112,57 @@ OUT="$(cat "${WORK}/out")"
 r=0; has 'kind=release' && has 'version=0.2.0-beta.1' && has 'sha12=0123456789ab' && has "tags=${IMG}:0.2.0-beta.1" || r=1
 check "GITHUB_OUTPUT gets kind, version, sha12 and tags" "${r}"
 
+# 10. release.yml's "Refuse to overwrite a published version" step, EXECUTED the way GitHub
+# runs a step with no shell: key (`bash -e {0}`), with docker stubbed. "not found" must let
+# the run continue, an existing tag must refuse, and any other answer must fail closed. A bare
+# `out=$(probe); rc=$?` dies under -e on the not-found answer, so case (a) catches that form.
+WORKFLOW="${SCRIPT_DIR}/../.github/workflows/release.yml"
+awk '
+  /^ *- name: Refuse to overwrite a published version *$/ { in_step = 1; next }
+  in_step && /^ *- name:/ { exit }
+  in_step && !in_run && /^ *run: \|/ { in_run = 1; indent = -1; next }
+  in_run {
+    if ($0 ~ /^ *$/) { print ""; next }
+    match($0, /^ */)
+    if (indent < 0) indent = RLENGTH
+    if (RLENGTH < indent) exit
+    print substr($0, indent + 1)
+  }
+' "${WORKFLOW}" > "${WORK}/overwrite-step.sh"
+OUT="$(cat "${WORK}/overwrite-step.sh")"
+r=0; has 'docker buildx imagetools inspect' && has 'already exists in GHCR' || r=1
+check "overwrite step's run block was extracted from release.yml" "${r}"
+
+mkdir -p "${WORK}/bin"
+cat > "${WORK}/bin/docker" <<'STUB'
+#!/usr/bin/env bash
+case "${STUB_PROBE}" in
+  present) printf 'Name: %s\nMediaType: application/vnd.oci.image.index.v1+json\n' "${4:-}"; exit 0 ;;
+  absent)  printf 'ERROR: %s: not found\n' "${4:-}" >&2; exit 1 ;;
+  *)       printf 'ERROR: denied: permission_denied\n' >&2; exit 1 ;;
+esac
+STUB
+chmod +x "${WORK}/bin/docker"
+
+step() {
+  # $1 = stub answer; runs the extracted block under bash -e; sets OUT and RC.
+  set +e
+  OUT="$(PATH="${WORK}/bin:${PATH}" STUB_PROBE="$1" IMAGE="${IMG}" VERSION=0.2.0-beta.1 \
+    bash -e "${WORK}/overwrite-step.sh" 2>&1)"
+  RC=$?
+  set -e
+}
+
+step absent
+r=0; [ "${RC}" -eq 0 ] && has 'is not published yet; continuing' || r=1
+check "overwrite step: image absent (first publish) continues under bash -e" "${r}"
+step present
+r=0; [ "${RC}" -ne 0 ] && has 'already exists in GHCR' || r=1
+check "overwrite step: image present refuses" "${r}"
+step denied
+r=0; [ "${RC}" -ne 0 ] && has 'could not tell whether' && lacks 'not published yet' || r=1
+check "overwrite step: any other registry answer fails closed" "${r}"
+
 if [ "${FAILURES}" -ne 0 ]; then
   printf '\ntest-release-version: %d failure(s)\n' "${FAILURES}" >&2
   exit 1
